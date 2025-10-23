@@ -137,6 +137,9 @@
       img.src = card.imageUrl;
       img.alt = card.name || 'Trading card image';
       img.loading = 'lazy';
+      img.decoding = 'async';
+      img.referrerPolicy = 'no-referrer';
+      img.addEventListener( 'error', () => handleImageError( img, card ) );
 
       const name = document.createElement( 'h3' );
       name.textContent = card.name || 'Untitled Card';
@@ -156,6 +159,43 @@
 
     resultsContainer.appendChild( fragment );
     renderPagination( totalPages );
+  }
+
+  function handleImageError( img, card ) {
+    if ( img.dataset.retry ) {
+      return;
+    }
+
+    const proxied = getProxiedImageUrl( card.imageUrl );
+
+    if ( proxied ) {
+      img.dataset.retry = 'true';
+      img.src = proxied;
+    } else {
+      img.dataset.retry = 'failed';
+    }
+  }
+
+  function getProxiedImageUrl( url ) {
+    if ( ! url ) {
+      return '';
+    }
+
+    let parsed;
+
+    try {
+      parsed = new URL( url );
+    } catch ( error ) {
+      return '';
+    }
+
+    const host = parsed.hostname.toLowerCase();
+
+    if ( ! host.endsWith( 'gundam-gcg.com' ) ) {
+      return '';
+    }
+
+    return 'https://images.weserv.nl/?url=' + encodeURIComponent( url );
   }
 
   function renderPagination( totalPages ) {
