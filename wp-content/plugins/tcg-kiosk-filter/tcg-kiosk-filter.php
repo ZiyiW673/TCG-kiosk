@@ -124,11 +124,17 @@ class TCG_Kiosk_Filter_Plugin {
     gap: var(--tcg-gap);
 }
 
-.tcg-kiosk__filters {
+.tcg-kiosk__header {
     display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
     align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--tcg-gap);
+}
+
+.tcg-kiosk__filters {
+    flex: 0 0 25%;
+    display: grid;
+    gap: 1rem;
 }
 
 .tcg-kiosk__filters label {
@@ -136,7 +142,6 @@ class TCG_Kiosk_Filter_Plugin {
     flex-direction: column;
     font-weight: 600;
     color: #1d2327;
-    min-width: 180px;
 }
 
 .tcg-kiosk__select,
@@ -148,8 +153,12 @@ class TCG_Kiosk_Filter_Plugin {
     color: #1d2327;
 }
 
+.tcg-kiosk__select {
+    width: 100%;
+}
+
 .tcg-kiosk__search {
-    flex: 1 1 240px;
+    flex: 0 0 25%;
     position: relative;
 }
 
@@ -236,11 +245,20 @@ class TCG_Kiosk_Filter_Plugin {
     color: #1d2327;
 }
 
-@media (max-width: 600px) {
-    .tcg-kiosk__filters {
+@media (max-width: 900px) {
+    .tcg-kiosk__header {
         flex-direction: column;
         align-items: stretch;
     }
+
+    .tcg-kiosk__filters,
+    .tcg-kiosk__search {
+        flex: 1 1 100%;
+    }
+}
+
+body.page-tcg-kiosk-browser .entry-title {
+    display: none;
 }
 CSS;
     }
@@ -537,24 +555,26 @@ JS;
         ob_start();
         ?>
         <div class="tcg-kiosk">
-            <div class="tcg-kiosk__filters">
-                <label>
-                    <span><?php esc_html_e( 'Trading Card Game', 'tcg-kiosk-filter' ); ?></span>
-                    <select id="tcg-kiosk-type" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Games', 'tcg-kiosk-filter' ); ?>">
-                        <option value=""><?php esc_html_e( 'All Games', 'tcg-kiosk-filter' ); ?></option>
-                    </select>
-                </label>
-                <label>
-                    <span><?php esc_html_e( 'Set', 'tcg-kiosk-filter' ); ?></span>
-                    <select id="tcg-kiosk-set" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Sets', 'tcg-kiosk-filter' ); ?>" disabled>
-                        <option value=""><?php esc_html_e( 'All Sets', 'tcg-kiosk-filter' ); ?></option>
-                    </select>
-                </label>
-                <label class="tcg-kiosk__search">
-                    <span class="screen-reader-text"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></span>
+            <header class="tcg-kiosk__header">
+                <div class="tcg-kiosk__filters" role="group" aria-label="<?php esc_attr_e( 'Filter cards', 'tcg-kiosk-filter' ); ?>">
+                    <label>
+                        <span><?php esc_html_e( 'Trading Card Game', 'tcg-kiosk-filter' ); ?></span>
+                        <select id="tcg-kiosk-type" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Games', 'tcg-kiosk-filter' ); ?>">
+                            <option value=""><?php esc_html_e( 'All Games', 'tcg-kiosk-filter' ); ?></option>
+                        </select>
+                    </label>
+                    <label>
+                        <span><?php esc_html_e( 'Set', 'tcg-kiosk-filter' ); ?></span>
+                        <select id="tcg-kiosk-set" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Sets', 'tcg-kiosk-filter' ); ?>" disabled>
+                            <option value=""><?php esc_html_e( 'All Sets', 'tcg-kiosk-filter' ); ?></option>
+                        </select>
+                    </label>
+                </div>
+                <div class="tcg-kiosk__search" role="search">
+                    <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
                     <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
-                </label>
-            </div>
+                </div>
+            </header>
             <div id="tcg-kiosk-results" class="tcg-kiosk__grid" aria-live="polite"></div>
             <nav id="tcg-kiosk-pagination" class="tcg-kiosk__pagination" aria-label="<?php esc_attr_e( 'Card results pagination', 'tcg-kiosk-filter' ); ?>" hidden></nav>
         </div>
