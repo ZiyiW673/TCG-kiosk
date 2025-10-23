@@ -78,6 +78,44 @@ font-style: italic;
 color: #50575e;
 }
 
+.tcg-kiosk__pagination {
+display: flex;
+gap: 1rem;
+align-items: center;
+justify-content: center;
+}
+
+.tcg-kiosk__page-button {
+border-radius: 4px;
+border: 1px solid #2271b1;
+background-color: #2271b1;
+color: #fff;
+padding: 0.5rem 1rem;
+font-size: 0.875rem;
+cursor: pointer;
+transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.tcg-kiosk__page-button:not([disabled]):hover,
+.tcg-kiosk__page-button:not([disabled]):focus {
+background-color: #135e96;
+border-color: #0a4b78;
+outline: none;
+}
+
+.tcg-kiosk__page-button[disabled] {
+background-color: #f0f0f1;
+border-color: #dcdcde;
+color: #a7aaad;
+cursor: default;
+}
+
+.tcg-kiosk__page-status {
+font-size: 0.875rem;
+font-weight: 600;
+color: #1d2327;
+}
+
 @media (max-width: 600px) {
 .tcg-kiosk__filters {
 flex-direction: column;

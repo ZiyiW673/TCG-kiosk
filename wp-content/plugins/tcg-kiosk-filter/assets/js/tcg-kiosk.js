@@ -7,13 +7,17 @@
   const setSelect = document.getElementById( 'tcg-kiosk-set' );
   const searchInput = document.getElementById( 'tcg-kiosk-search' );
   const resultsContainer = document.getElementById( 'tcg-kiosk-results' );
+  const paginationContainer = document.getElementById( 'tcg-kiosk-pagination' );
 
-  if ( ! typeSelect || ! setSelect || ! searchInput || ! resultsContainer ) {
+  if ( ! typeSelect || ! setSelect || ! searchInput || ! resultsContainer || ! paginationContainer ) {
     return;
   }
 
   const data = window.tcgKioskData.cards;
+  const i18n = window.tcgKioskData.i18n || {};
+  const CARDS_PER_PAGE = 10;
   let hasInteracted = false;
+  let currentPage = 1;
 
   function createOption( value, label ) {
     const option = document.createElement( 'option' );
@@ -95,24 +99,37 @@
   function renderCards() {
     if ( ! hasInteracted ) {
       resultsContainer.innerHTML = '';
+      renderPagination( 0 );
       return;
     }
 
     const cards = getFilteredCards();
+
+    const totalPages = Math.ceil( cards.length / CARDS_PER_PAGE );
+
+    if ( totalPages === 0 ) {
+      currentPage = 1;
+    } else if ( currentPage > totalPages ) {
+      currentPage = totalPages;
+    }
 
     resultsContainer.innerHTML = '';
 
     if ( ! cards.length ) {
       const emptyState = document.createElement( 'p' );
       emptyState.className = 'tcg-kiosk__empty';
-      emptyState.textContent = window.tcgKioskData.i18n?.noCards || 'No cards match your filters.';
+      emptyState.textContent = i18n.noCards || 'No cards match your filters.';
       resultsContainer.appendChild( emptyState );
+      renderPagination( 0 );
       return;
     }
 
     const fragment = document.createDocumentFragment();
 
-    cards.forEach( ( card ) => {
+    const startIndex = ( currentPage - 1 ) * CARDS_PER_PAGE;
+    const pageCards = cards.slice( startIndex, startIndex + CARDS_PER_PAGE );
+
+    pageCards.forEach( ( card ) => {
       const item = document.createElement( 'article' );
       item.className = 'tcg-kiosk__card';
 
@@ -138,25 +155,73 @@
     } );
 
     resultsContainer.appendChild( fragment );
+    renderPagination( totalPages );
+  }
+
+  function renderPagination( totalPages ) {
+    paginationContainer.innerHTML = '';
+
+    if ( totalPages <= 1 ) {
+      paginationContainer.hidden = true;
+      return;
+    }
+
+    paginationContainer.hidden = false;
+
+    const prevButton = document.createElement( 'button' );
+    prevButton.type = 'button';
+    prevButton.className = 'tcg-kiosk__page-button';
+    prevButton.textContent = i18n.previous || 'Previous';
+    prevButton.disabled = currentPage === 1;
+    prevButton.addEventListener( 'click', () => {
+      if ( currentPage > 1 ) {
+        currentPage -= 1;
+        renderCards();
+      }
+    } );
+
+    const status = document.createElement( 'span' );
+    status.className = 'tcg-kiosk__page-status';
+    const statusTemplate = i18n.pageStatus || 'Page %1$s of %2$s';
+    status.textContent = statusTemplate.replace( '%1$s', currentPage ).replace( '%2$s', totalPages );
+
+    const nextButton = document.createElement( 'button' );
+    nextButton.type = 'button';
+    nextButton.className = 'tcg-kiosk__page-button';
+    nextButton.textContent = i18n.next || 'Next';
+    nextButton.disabled = currentPage === totalPages;
+    nextButton.addEventListener( 'click', () => {
+      if ( currentPage < totalPages ) {
+        currentPage += 1;
+        renderCards();
+      }
+    } );
+
+    paginationContainer.appendChild( prevButton );
+    paginationContainer.appendChild( status );
+    paginationContainer.appendChild( nextButton );
   }
 
   typeSelect.addEventListener( 'change', () => {
     hasInteracted = true;
+    currentPage = 1;
     updateSetOptions();
     renderCards();
   } );
 
   setSelect.addEventListener( 'change', () => {
     hasInteracted = true;
+    currentPage = 1;
     renderCards();
   } );
 
   searchInput.addEventListener( 'input', () => {
     hasInteracted = true;
+    currentPage = 1;
     renderCards();
   } );
 
-  const placeholders = window.tcgKioskData.i18n || {};
+  const placeholders = i18n;
   typeSelect.dataset.placeholder = placeholders.allGames || typeSelect.dataset.placeholder;
   setSelect.dataset.placeholder = placeholders.allSets || setSelect.dataset.placeholder;
   typeSelect.querySelector( 'option[value=""]' ).textContent = typeSelect.dataset.placeholder;
@@ -164,4 +229,5 @@
 
   populateTypeOptions();
   updateSetOptions();
+  renderPagination( 0 );
 })();

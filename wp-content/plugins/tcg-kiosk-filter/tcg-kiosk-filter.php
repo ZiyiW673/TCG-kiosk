@@ -113,6 +113,9 @@ class TCG_Kiosk_Filter_Plugin {
                     'allGames' => __( 'All Games', 'tcg-kiosk-filter' ),
                     'allSets'  => __( 'All Sets', 'tcg-kiosk-filter' ),
                     'noCards'  => __( 'No cards match your filters.', 'tcg-kiosk-filter' ),
+                    'previous' => __( 'Previous', 'tcg-kiosk-filter' ),
+                    'next'     => __( 'Next', 'tcg-kiosk-filter' ),
+                    'pageStatus' => __( 'Page %1$s of %2$s', 'tcg-kiosk-filter' ),
                 ),
             )
         );
@@ -146,6 +149,7 @@ class TCG_Kiosk_Filter_Plugin {
                 </label>
             </div>
             <div id="tcg-kiosk-results" class="tcg-kiosk__grid" aria-live="polite"></div>
+            <nav id="tcg-kiosk-pagination" class="tcg-kiosk__pagination" aria-label="<?php esc_attr_e( 'Card results pagination', 'tcg-kiosk-filter' ); ?>" hidden></nav>
         </div>
         <?php
         return ob_get_clean();
