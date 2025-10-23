@@ -13,6 +13,7 @@
   }
 
   const data = window.tcgKioskData.cards;
+  let hasInteracted = false;
 
   function createOption( value, label ) {
     const option = document.createElement( 'option' );
@@ -92,6 +93,11 @@
   }
 
   function renderCards() {
+    if ( ! hasInteracted ) {
+      resultsContainer.innerHTML = '';
+      return;
+    }
+
     const cards = getFilteredCards();
 
     resultsContainer.innerHTML = '';
@@ -135,12 +141,20 @@
   }
 
   typeSelect.addEventListener( 'change', () => {
+    hasInteracted = true;
     updateSetOptions();
     renderCards();
   } );
 
-  setSelect.addEventListener( 'change', renderCards );
-  searchInput.addEventListener( 'input', renderCards );
+  setSelect.addEventListener( 'change', () => {
+    hasInteracted = true;
+    renderCards();
+  } );
+
+  searchInput.addEventListener( 'input', () => {
+    hasInteracted = true;
+    renderCards();
+  } );
 
   const placeholders = window.tcgKioskData.i18n || {};
   typeSelect.dataset.placeholder = placeholders.allGames || typeSelect.dataset.placeholder;
@@ -150,5 +164,4 @@
 
   populateTypeOptions();
   updateSetOptions();
-  renderCards();
 })();
