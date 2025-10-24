@@ -121,18 +121,21 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         continue;
                     }
 
-                    $image_url = $this->extract_image_url( $card['images'] );
+                    $image_sources = $this->prepare_image_sources( $card['images'] );
 
-                    if ( empty( $image_url ) ) {
+                    if ( empty( $image_sources['primary'] ) ) {
                         continue;
                     }
 
                     $cards[] = array(
-                        'id'         => isset( $card['id'] ) ? (string) $card['id'] : '',
-                        'name'       => isset( $card['name'] ) ? (string) $card['name'] : '',
-                        'set'        => $this->derive_set_name( $file->getBasename( '.json' ) ),
-                        'imageUrl'   => esc_url_raw( $image_url ),
-                        'typeValues' => $this->extract_type_values( $card, $config ),
+                        'id'           => isset( $card['id'] ) ? (string) $card['id'] : '',
+                        'name'         => isset( $card['name'] ) ? (string) $card['name'] : '',
+                        'set'          => $this->derive_set_name( $file->getBasename( '.json' ) ),
+                        'imageUrl'     => $image_sources['primary'],
+                        'imageFullUrl' => $image_sources['full'],
+                        'imageSrcset'  => $image_sources['srcset'],
+                        'imageSizes'   => $image_sources['sizes'],
+                        'typeValues'   => $this->extract_type_values( $card, $config ),
                     );
                 }
             }
@@ -367,14 +370,117 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          *
          * @return string
          */
-        protected function extract_image_url( array $images ) {
-            foreach ( array( 'large', 'small', 'normal', 'image' ) as $key ) {
-                if ( ! empty( $images[ $key ] ) ) {
-                    return $images[ $key ];
+        protected function prepare_image_sources( array $images ) {
+            $sources = array(
+                'primary' => '',
+                'full'    => '',
+                'srcset'  => '',
+                'sizes'   => '',
+            );
+
+            if ( empty( $images ) ) {
+                return $sources;
+            }
+
+            $map      = array(
+                'small'  => array(
+                    'descriptor' => '1x',
+                    'priority'   => 10,
+                ),
+                'normal' => array(
+                    'descriptor' => '1.5x',
+                    'priority'   => 20,
+                ),
+                'large'  => array(
+                    'descriptor' => '2x',
+                    'priority'   => 30,
+                ),
+                'image'  => array(
+                    'descriptor' => '3x',
+                    'priority'   => 40,
+                ),
+            );
+            $entries  = array();
+
+            foreach ( $map as $key => $meta ) {
+                if ( empty( $images[ $key ] ) || ! is_string( $images[ $key ] ) ) {
+                    continue;
+                }
+
+                $url = trim( $images[ $key ] );
+
+                if ( '' === $url ) {
+                    continue;
+                }
+
+                if ( '' === $sources['primary'] ) {
+                    $sources['primary'] = $url;
+                }
+
+                if ( in_array( $key, array( 'large', 'image' ), true ) ) {
+                    $sources['full'] = $url;
+                }
+
+                $entries[] = array(
+                    'priority'   => $meta['priority'],
+                    'descriptor' => $meta['descriptor'],
+                    'url'        => $url,
+                );
+            }
+
+            if ( '' === $sources['primary'] ) {
+                foreach ( $images as $image_url ) {
+                    if ( is_string( $image_url ) && '' !== trim( $image_url ) ) {
+                        $sources['primary'] = trim( $image_url );
+                        break;
+                    }
                 }
             }
 
-            return '';
+            if ( '' === $sources['full'] ) {
+                $sources['full'] = $sources['primary'];
+            }
+
+            if ( ! empty( $entries ) ) {
+                usort(
+                    $entries,
+                    static function ( $a, $b ) {
+                        return $a['priority'] <=> $b['priority'];
+                    }
+                );
+
+                $seen  = array();
+                $parts = array();
+
+                foreach ( $entries as $entry ) {
+                    if ( isset( $seen[ $entry['descriptor'] ] ) ) {
+                        continue;
+                    }
+
+                    $sanitized_url = esc_url_raw( $entry['url'] );
+
+                    if ( '' === $sanitized_url ) {
+                        continue;
+                    }
+
+                    $seen[ $entry['descriptor'] ] = true;
+                    $parts[]                       = $sanitized_url . ' ' . $entry['descriptor'];
+                }
+
+                if ( ! empty( $parts ) ) {
+                    $sources['srcset'] = implode( ', ', $parts );
+                    $sources['sizes']  = '(max-width: 600px) 80vw, (max-width: 900px) 40vw, 220px';
+                }
+            }
+
+            $sources['primary'] = esc_url_raw( $sources['primary'] );
+            $sources['full']    = esc_url_raw( $sources['full'] );
+
+            if ( '' === $sources['srcset'] ) {
+                $sources['sizes'] = '';
+            }
+
+            return $sources;
         }
 
         /**

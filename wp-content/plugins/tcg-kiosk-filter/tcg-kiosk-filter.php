@@ -645,7 +645,7 @@ CSS;
     const startIndex = ( currentPage - 1 ) * CARDS_PER_PAGE;
     const pageCards = cards.slice( startIndex, startIndex + CARDS_PER_PAGE );
 
-    pageCards.forEach( ( card ) => {
+    pageCards.forEach( ( card, index ) => {
       const item = document.createElement( 'article' );
       item.className = 'tcg-kiosk__card';
 
@@ -655,6 +655,18 @@ CSS;
       img.loading = 'lazy';
       img.decoding = 'async';
       img.referrerPolicy = 'no-referrer';
+      if ( card.imageSrcset ) {
+        img.srcset = card.imageSrcset;
+      }
+      if ( card.imageSizes ) {
+        img.sizes = card.imageSizes;
+      }
+      if ( card.imageFullUrl && card.imageFullUrl !== card.imageUrl ) {
+        img.dataset.fullSrc = card.imageFullUrl;
+      }
+      if ( 0 === startIndex && index < 2 ) {
+        img.fetchPriority = 'high';
+      }
       img.addEventListener( 'error', () => handleImageError( img, card ) );
 
       const name = document.createElement( 'h3' );
@@ -678,18 +690,25 @@ CSS;
   }
 
   function handleImageError( img, card ) {
-    if ( img.dataset.retry ) {
+    const attempts = img.dataset.attempts ? img.dataset.attempts.split( ',' ) : [];
+
+    if ( card.imageFullUrl && img.src !== card.imageFullUrl && ! attempts.includes( 'full' ) ) {
+      attempts.push( 'full' );
+      img.dataset.attempts = attempts.join( ',' );
+      img.src = card.imageFullUrl;
       return;
     }
 
-    const proxied = getProxiedImageUrl( card.imageUrl );
+    const proxied = getProxiedImageUrl( card.imageFullUrl || card.imageUrl );
 
-    if ( proxied ) {
-      img.dataset.retry = 'true';
+    if ( proxied && img.src !== proxied && ! attempts.includes( 'proxy' ) ) {
+      attempts.push( 'proxy' );
+      img.dataset.attempts = attempts.join( ',' );
       img.src = proxied;
-    } else {
-      img.dataset.retry = 'failed';
+      return;
     }
+
+    img.dataset.attempts = attempts.concat( 'failed' ).join( ',' );
   }
 
   function getProxiedImageUrl( url ) {
