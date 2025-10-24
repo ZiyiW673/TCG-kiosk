@@ -144,6 +144,11 @@ class TCG_Kiosk_Filter_Plugin {
     --tcg-gap: 1.5rem;
     display: grid;
     gap: var(--tcg-gap);
+    height: 100vh;
+    max-height: 100dvh;
+    min-height: 100vh;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
 }
 
 .tcg-kiosk__header {
@@ -256,31 +261,48 @@ class TCG_Kiosk_Filter_Plugin {
 
 .tcg-kiosk__grid {
     --tcg-card-columns: 5;
-    --tcg-card-min-width: 210px;
+    --tcg-card-rows: 2;
     display: grid;
-    gap: 1.5rem;
-    grid-template-columns: repeat(var(--tcg-card-columns), minmax(var(--tcg-card-min-width), 1fr));
+    gap: var(--tcg-gap);
+    grid-template-columns: repeat(var(--tcg-card-columns), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--tcg-card-rows), minmax(0, 1fr));
+    align-items: stretch;
+    justify-items: stretch;
+    overflow: hidden;
 }
 
 .tcg-kiosk[data-page-size="10"] .tcg-kiosk__grid {
     --tcg-card-columns: 5;
-    --tcg-card-min-width: 210px;
+    --tcg-card-rows: 2;
+}
+
+.tcg-kiosk[data-page-size="12"] {
+    --tcg-gap: 1.35rem;
 }
 
 .tcg-kiosk[data-page-size="12"] .tcg-kiosk__grid {
     --tcg-card-columns: 4;
-    --tcg-card-min-width: 190px;
+    --tcg-card-rows: 3;
+}
+
+.tcg-kiosk[data-page-size="16"] {
+    --tcg-gap: 1.25rem;
 }
 
 .tcg-kiosk[data-page-size="16"] .tcg-kiosk__grid {
     --tcg-card-columns: 4;
-    --tcg-card-min-width: 170px;
+    --tcg-card-rows: 4;
+}
+
+.tcg-kiosk[data-page-size="20"] {
+    --tcg-gap: 1.15rem;
 }
 
 .tcg-kiosk[data-page-size="20"] .tcg-kiosk__grid {
     --tcg-card-columns: 5;
-    --tcg-card-min-width: 160px;
+    --tcg-card-rows: 4;
 }
+
 
 .tcg-kiosk__card {
     background: #fff;
@@ -289,8 +311,11 @@ class TCG_Kiosk_Filter_Plugin {
     box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
     overflow: hidden;
     padding: 1rem;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 0.75rem;
+    height: 100%;
+    min-height: 0;
 }
 
 .tcg-kiosk[data-page-size="16"] .tcg-kiosk__card,
@@ -309,20 +334,25 @@ class TCG_Kiosk_Filter_Plugin {
 
 .tcg-kiosk__card img {
     width: 100%;
-    height: auto;
+    height: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
     border-radius: 4px;
     background: #f6f7f7;
+    object-fit: contain;
 }
 
 .tcg-kiosk__card h3 {
     margin: 0;
     font-size: 1rem;
+    flex: 0 0 auto;
 }
 
 .tcg-kiosk__meta {
     margin: 0;
     font-size: 0.875rem;
     color: #50575e;
+    margin-top: auto;
 }
 
 .tcg-kiosk[data-page-size="16"] .tcg-kiosk__meta {
