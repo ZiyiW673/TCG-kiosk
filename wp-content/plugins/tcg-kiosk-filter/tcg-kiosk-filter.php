@@ -127,6 +127,7 @@ class TCG_Kiosk_Filter_Plugin {
                     'previous' => __( 'Previous', 'tcg-kiosk-filter' ),
                     'next'     => __( 'Next', 'tcg-kiosk-filter' ),
                     'pageStatus' => __( 'Page %1$s of %2$s', 'tcg-kiosk-filter' ),
+                    'cardsPerPage' => __( 'Cards per page', 'tcg-kiosk-filter' ),
                 ),
             )
         );
@@ -226,8 +227,15 @@ class TCG_Kiosk_Filter_Plugin {
     width: 100%;
 }
 
-.tcg-kiosk__search {
+
+.tcg-kiosk__actions {
     flex: 0 0 25%;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.tcg-kiosk__search {
     position: relative;
 }
 
@@ -235,10 +243,43 @@ class TCG_Kiosk_Filter_Plugin {
     width: 100%;
 }
 
+.tcg-kiosk__page-size {
+    display: flex;
+    flex-direction: column;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.tcg-kiosk__page-size select {
+    margin-top: 0.35rem;
+}
+
 .tcg-kiosk__grid {
+    --tcg-card-columns: 5;
+    --tcg-card-min-width: 210px;
     display: grid;
     gap: 1.5rem;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(var(--tcg-card-columns), minmax(var(--tcg-card-min-width), 1fr));
+}
+
+.tcg-kiosk[data-page-size="10"] .tcg-kiosk__grid {
+    --tcg-card-columns: 5;
+    --tcg-card-min-width: 210px;
+}
+
+.tcg-kiosk[data-page-size="12"] .tcg-kiosk__grid {
+    --tcg-card-columns: 4;
+    --tcg-card-min-width: 190px;
+}
+
+.tcg-kiosk[data-page-size="16"] .tcg-kiosk__grid {
+    --tcg-card-columns: 4;
+    --tcg-card-min-width: 170px;
+}
+
+.tcg-kiosk[data-page-size="20"] .tcg-kiosk__grid {
+    --tcg-card-columns: 5;
+    --tcg-card-min-width: 160px;
 }
 
 .tcg-kiosk__card {
@@ -250,6 +291,20 @@ class TCG_Kiosk_Filter_Plugin {
     padding: 1rem;
     display: grid;
     gap: 0.75rem;
+}
+
+.tcg-kiosk[data-page-size="16"] .tcg-kiosk__card,
+.tcg-kiosk[data-page-size="20"] .tcg-kiosk__card {
+    padding: 0.75rem;
+    gap: 0.5rem;
+}
+
+.tcg-kiosk[data-page-size="20"] .tcg-kiosk__card h3 {
+    font-size: 0.95rem;
+}
+
+.tcg-kiosk[data-page-size="16"] .tcg-kiosk__card h3 {
+    font-size: 0.98rem;
 }
 
 .tcg-kiosk__card img {
@@ -268,6 +323,14 @@ class TCG_Kiosk_Filter_Plugin {
     margin: 0;
     font-size: 0.875rem;
     color: #50575e;
+}
+
+.tcg-kiosk[data-page-size="16"] .tcg-kiosk__meta {
+    font-size: 0.84rem;
+}
+
+.tcg-kiosk[data-page-size="20"] .tcg-kiosk__meta {
+    font-size: 0.8rem;
 }
 
 .tcg-kiosk__empty {
@@ -322,7 +385,7 @@ class TCG_Kiosk_Filter_Plugin {
 
     .tcg-kiosk__filters,
     .tcg-kiosk__type-filter,
-    .tcg-kiosk__search {
+    .tcg-kiosk__actions {
         flex: 1 1 100%;
     }
 }
@@ -345,25 +408,38 @@ CSS;
     return;
   }
 
+  const kioskRoot = document.querySelector( '.tcg-kiosk' );
   const gameSelect = document.getElementById( 'tcg-kiosk-game' );
   const setSelect = document.getElementById( 'tcg-kiosk-set' );
   const typeFilterWrapper = document.getElementById( 'tcg-kiosk-type-filter' );
   const typeFilterLabel = document.getElementById( 'tcg-kiosk-type-label' );
   const typeOptionsContainer = document.getElementById( 'tcg-kiosk-type-options' );
   const searchInput = document.getElementById( 'tcg-kiosk-search' );
+  const pageSizeSelect = document.getElementById( 'tcg-kiosk-page-size' );
+  const pageSizeLabel = document.querySelector( 'label[for="tcg-kiosk-page-size"] span' );
   const resultsContainer = document.getElementById( 'tcg-kiosk-results' );
   const paginationContainer = document.getElementById( 'tcg-kiosk-pagination' );
 
-  if ( ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeFilterLabel || ! typeOptionsContainer || ! searchInput || ! resultsContainer || ! paginationContainer ) {
+  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeFilterLabel || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
   }
 
   const data = window.tcgKioskData.cards;
   const i18n = window.tcgKioskData.i18n || {};
-  const CARDS_PER_PAGE = 10;
+  const DEFAULT_PAGE_SIZE = parseInt( pageSizeSelect.value, 10 ) || 10;
+  let cardsPerPage = DEFAULT_PAGE_SIZE;
   let hasInteracted = false;
   let currentPage = 1;
   let selectedTypeValue = '';
+
+  function applyPageSizeLayout() {
+    const normalized = [ 10, 12, 16, 20 ].includes( cardsPerPage ) ? cardsPerPage : 10;
+    cardsPerPage = normalized;
+    kioskRoot.dataset.pageSize = String( normalized );
+    if ( pageSizeSelect.value !== String( normalized ) ) {
+      pageSizeSelect.value = String( normalized );
+    }
+  }
 
   function createOption( value, label ) {
     const option = document.createElement( 'option' );
@@ -376,6 +452,12 @@ CSS;
     data.forEach( ( type ) => {
       gameSelect.appendChild( createOption( type.slug, type.label ) );
     } );
+  }
+
+  function updatePageSizeLabel() {
+    if ( pageSizeLabel && i18n.cardsPerPage ) {
+      pageSizeLabel.textContent = i18n.cardsPerPage;
+    }
   }
 
   function getFilteredCards() {
@@ -672,6 +754,8 @@ CSS;
   }
 
   function renderCards() {
+    applyPageSizeLayout();
+
     if ( ! hasInteracted ) {
       resultsContainer.innerHTML = '';
       renderPagination( 0 );
@@ -680,7 +764,7 @@ CSS;
 
     const cards = getFilteredCards();
 
-    const totalPages = Math.ceil( cards.length / CARDS_PER_PAGE );
+    const totalPages = Math.ceil( cards.length / cardsPerPage );
 
     if ( totalPages === 0 ) {
       currentPage = 1;
@@ -701,8 +785,8 @@ CSS;
 
     const fragment = document.createDocumentFragment();
 
-    const startIndex = ( currentPage - 1 ) * CARDS_PER_PAGE;
-    const pageCards = cards.slice( startIndex, startIndex + CARDS_PER_PAGE );
+    const startIndex = ( currentPage - 1 ) * cardsPerPage;
+    const pageCards = cards.slice( startIndex, startIndex + cardsPerPage );
 
     pageCards.forEach( ( card, index ) => {
       const item = document.createElement( 'article' );
@@ -888,15 +972,29 @@ CSS;
     renderCards();
   } );
 
+  pageSizeSelect.addEventListener( 'change', () => {
+    const requested = parseInt( pageSizeSelect.value, 10 );
+
+    if ( Number.isInteger( requested ) ) {
+      cardsPerPage = requested;
+      applyPageSizeLayout();
+      hasInteracted = true;
+      currentPage = 1;
+      renderCards();
+    }
+  } );
+
   const placeholders = i18n;
   gameSelect.dataset.placeholder = placeholders.allGames || gameSelect.dataset.placeholder;
   setSelect.dataset.placeholder = placeholders.allSets || setSelect.dataset.placeholder;
   gameSelect.querySelector( 'option[value=""]' ).textContent = gameSelect.dataset.placeholder;
   setSelect.querySelector( 'option[value=""]' ).textContent = setSelect.dataset.placeholder;
 
+  updatePageSizeLabel();
   populateGameOptions();
   updateSetOptions();
   updateTypeOptions();
+  applyPageSizeLayout();
   renderPagination( 0 );
 })();
 JS;
@@ -910,7 +1008,7 @@ JS;
     public function render_shortcode() {
         ob_start();
         ?>
-        <div class="tcg-kiosk">
+        <div class="tcg-kiosk" data-page-size="10">
             <header class="tcg-kiosk__header">
                 <div class="tcg-kiosk__filters" role="group" aria-label="<?php esc_attr_e( 'Filter cards', 'tcg-kiosk-filter' ); ?>">
                     <label>
@@ -930,9 +1028,20 @@ JS;
                     <span id="tcg-kiosk-type-label" class="tcg-kiosk__type-filter-label"><?php esc_html_e( 'Type', 'tcg-kiosk-filter' ); ?></span>
                     <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
                 </div>
-                <div class="tcg-kiosk__search" role="search">
-                    <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
-                    <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
+                <div class="tcg-kiosk__actions">
+                    <div class="tcg-kiosk__search" role="search">
+                        <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
+                        <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
+                    </div>
+                    <label class="tcg-kiosk__page-size" for="tcg-kiosk-page-size">
+                        <span><?php esc_html_e( 'Cards per page', 'tcg-kiosk-filter' ); ?></span>
+                        <select id="tcg-kiosk-page-size" class="tcg-kiosk__select">
+                            <option value="10" selected>10</option>
+                            <option value="12">12</option>
+                            <option value="16">16</option>
+                            <option value="20">20</option>
+                        </select>
+                    </label>
                 </div>
             </header>
             <div id="tcg-kiosk-results" class="tcg-kiosk__grid" aria-live="polite"></div>
