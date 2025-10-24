@@ -11,9 +11,10 @@ defined( 'ABSPATH' ) || exit;
 require_once __DIR__ . '/tcg-kiosk-database.php';
 
 class TCG_Kiosk_Filter_Plugin {
-    const SHORTCODE  = 'tcg_kiosk_browser';
-    const PAGE_SLUG  = 'tcg-kiosk-browser';
-    const PAGE_TITLE = 'TCG Kiosk Browser';
+    const SHORTCODE   = 'tcg_kiosk_browser';
+    const PAGE_SLUG   = 'tcg-kiosk-browser';
+    const PAGE_TITLE  = 'TCG Kiosk Browser';
+    const PAGE_OPTION = 'tcg_kiosk_browser_page_id';
 
     /**
      * Singleton instance.
@@ -51,6 +52,7 @@ class TCG_Kiosk_Filter_Plugin {
         register_activation_hook( __FILE__, array( $this, 'activate_plugin' ) );
         add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
         add_action( 'init', array( $this, 'register_shortcode' ) );
+        add_action( 'init', array( $this, 'ensure_page_exists' ) );
         add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
     }
 
@@ -58,6 +60,24 @@ class TCG_Kiosk_Filter_Plugin {
      * Plugin activation callback.
      */
     public function activate_plugin() {
+        $this->ensure_page_exists();
+    }
+
+    /**
+     * Ensure the kiosk page exists and matches the expected content.
+     */
+    public function ensure_page_exists() {
+        $page_id = (int) get_option( self::PAGE_OPTION );
+
+        if ( $page_id ) {
+            $page = get_post( $page_id );
+
+            if ( $page instanceof WP_Post ) {
+                $this->synchronize_page( $page_id );
+                return;
+            }
+        }
+
         $this->maybe_create_page();
     }
 
@@ -588,7 +608,24 @@ JS;
     protected function maybe_create_page() {
         $page = get_page_by_path( self::PAGE_SLUG );
 
-        if ( $page ) {
+        if ( $page instanceof WP_Post ) {
+            $this->synchronize_page( $page->ID );
+            return;
+        }
+
+        $trashed_page = get_posts(
+            array(
+                'post_type'      => 'page',
+                'post_status'    => 'trash',
+                'name'           => self::PAGE_SLUG,
+                'posts_per_page' => 1,
+            )
+        );
+
+        if ( ! empty( $trashed_page ) ) {
+            $page_id = (int) $trashed_page[0]->ID;
+            wp_untrash_post( $page_id );
+            $this->synchronize_page( $page_id );
             return;
         }
 
@@ -605,6 +642,57 @@ JS;
         if ( is_wp_error( $page_id ) ) {
             return;
         }
+
+        update_option( self::PAGE_OPTION, (int) $page_id );
+    }
+
+    /**
+     * Normalise the kiosk page content, slug and publication status.
+     *
+     * @param int $page_id Page identifier to synchronise.
+     */
+    protected function synchronize_page( $page_id ) {
+        $page = get_post( $page_id );
+
+        if ( ! $page instanceof WP_Post ) {
+            return;
+        }
+
+        if ( 'trash' === $page->post_status ) {
+            wp_untrash_post( $page_id );
+            $page = get_post( $page_id );
+        }
+
+        $update = array( 'ID' => $page_id );
+        $needs_update = false;
+
+        if ( self::PAGE_TITLE !== $page->post_title ) {
+            $update['post_title'] = self::PAGE_TITLE;
+            $needs_update         = true;
+        }
+
+        $expected_content = '[' . self::SHORTCODE . ']';
+
+        if ( $expected_content !== trim( $page->post_content ) ) {
+            $update['post_content'] = $expected_content;
+            $needs_update           = true;
+        }
+
+        if ( self::PAGE_SLUG !== $page->post_name ) {
+            $update['post_name'] = self::PAGE_SLUG;
+            $needs_update        = true;
+        }
+
+        if ( 'publish' !== $page->post_status ) {
+            $update['post_status'] = 'publish';
+            $needs_update          = true;
+        }
+
+        if ( $needs_update ) {
+            wp_update_post( $update );
+        }
+
+        update_option( self::PAGE_OPTION, (int) $page_id );
     }
 
     /**
