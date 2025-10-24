@@ -382,6 +382,7 @@ CSS;
     const typeValue = gameSelect.value;
     const setValue = setSelect.value;
     const searchTerm = searchInput.value.trim().toLowerCase();
+    const selectedGroup = typeValue ? data.find( ( group ) => group.slug === typeValue ) : null;
     let filtered = [];
 
     if ( typeValue ) {
@@ -402,13 +403,11 @@ CSS;
     }
 
     if ( selectedTypeValue ) {
-      cards = cards.filter( ( card ) => {
-        if ( ! Array.isArray( card.typeValues ) || ! card.typeValues.length ) {
-          return false;
-        }
-
-        return card.typeValues.some( ( value ) => value === selectedTypeValue );
-      } );
+      if ( selectedGroup ) {
+        cards = cards.filter( ( card ) => cardMatchesSelectedType( card, selectedGroup ) );
+      } else {
+        cards = [];
+      }
     }
 
     if ( searchTerm ) {
@@ -486,6 +485,48 @@ CSS;
     return button;
   }
 
+  function normalizeTypeValue( value, caseInsensitive ) {
+    if ( 'string' !== typeof value ) {
+      return '';
+    }
+
+    const cleaned = value.trim();
+
+    if ( ! cleaned ) {
+      return '';
+    }
+
+    return caseInsensitive ? cleaned.toLowerCase() : cleaned;
+  }
+
+  function cardMatchesSelectedType( card, group ) {
+    if ( ! group || ! Array.isArray( card.typeValues ) || ! card.typeValues.length ) {
+      return false;
+    }
+
+    const matchMode = group.typeMatchMode || 'exact';
+    const caseInsensitive = Boolean( group.typeCaseInsensitive );
+    const selection = normalizeTypeValue( selectedTypeValue, caseInsensitive );
+
+    if ( ! selection ) {
+      return false;
+    }
+
+    return card.typeValues.some( ( rawValue ) => {
+      const candidate = normalizeTypeValue( rawValue, caseInsensitive );
+
+      if ( ! candidate ) {
+        return false;
+      }
+
+      if ( 'contains' === matchMode ) {
+        return candidate.includes( selection );
+      }
+
+      return candidate === selection;
+    } );
+  }
+
   function updateTypeOptions() {
     selectedTypeValue = '';
     typeOptionsContainer.innerHTML = '';
@@ -509,31 +550,63 @@ CSS;
     const label = selected.typeLabel || defaultLabel;
     typeFilterLabel.textContent = label;
 
-    const typeValues = new Set();
+    const presetOptions = Array.isArray( selected.typeOptions ) ? selected.typeOptions : [];
+    const template = i18n.allTypeTemplate || 'All %s';
+    const allLabel = template.includes( '%s' ) ? template.replace( '%s', label ) : template;
+    const options = [];
 
-    selected.cards.forEach( ( card ) => {
-      if ( Array.isArray( card.typeValues ) ) {
-        card.typeValues.forEach( ( value ) => {
-          if ( value ) {
-            typeValues.add( value );
-          }
-        } );
+    if ( presetOptions.length ) {
+      presetOptions.forEach( ( option ) => {
+        if ( ! option ) {
+          return;
+        }
+
+        if ( 'string' === typeof option ) {
+          options.push( { value: option, label: option } );
+          return;
+        }
+
+        const value = option.value;
+
+        if ( ! value ) {
+          return;
+        }
+
+        options.push( { value, label: option.label || value } );
+      } );
+    } else {
+      const typeValues = new Set();
+
+      selected.cards.forEach( ( card ) => {
+        if ( Array.isArray( card.typeValues ) ) {
+          card.typeValues.forEach( ( value ) => {
+            if ( value ) {
+              typeValues.add( value );
+            }
+          } );
+        }
+      } );
+
+      if ( ! typeValues.size ) {
+        return;
       }
-    } );
 
-    if ( ! typeValues.size ) {
+      Array.from( typeValues )
+        .sort( ( a, b ) => a.localeCompare( b ) )
+        .forEach( ( value ) => {
+          options.push( { value, label: value } );
+        } );
+    }
+
+    if ( ! options.length ) {
       return;
     }
 
-    const template = i18n.allTypeTemplate || 'All %s';
-    const allLabel = template.includes( '%s' ) ? template.replace( '%s', label ) : template;
     typeOptionsContainer.appendChild( createTypeButton( '', allLabel ) );
 
-    Array.from( typeValues )
-      .sort( ( a, b ) => a.localeCompare( b ) )
-      .forEach( ( value ) => {
-        typeOptionsContainer.appendChild( createTypeButton( value, value ) );
-      } );
+    options.forEach( ( option ) => {
+      typeOptionsContainer.appendChild( createTypeButton( option.value, option.label ) );
+    } );
 
     updateActiveTypeButton();
     typeFilterWrapper.hidden = false;
