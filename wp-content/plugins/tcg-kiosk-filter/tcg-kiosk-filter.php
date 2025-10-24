@@ -281,8 +281,8 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk[data-page-size="12"] .tcg-kiosk__grid {
-    --tcg-card-columns: 4;
-    --tcg-card-rows: 3;
+    --tcg-card-columns: 6;
+    --tcg-card-rows: 2;
 }
 
 .tcg-kiosk[data-page-size="16"] {
@@ -290,8 +290,8 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk[data-page-size="16"] .tcg-kiosk__grid {
-    --tcg-card-columns: 4;
-    --tcg-card-rows: 4;
+    --tcg-card-columns: 8;
+    --tcg-card-rows: 2;
 }
 
 .tcg-kiosk[data-page-size="20"] {
@@ -299,8 +299,8 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk[data-page-size="20"] .tcg-kiosk__grid {
-    --tcg-card-columns: 5;
-    --tcg-card-rows: 4;
+    --tcg-card-columns: 10;
+    --tcg-card-rows: 2;
 }
 
 
