@@ -612,6 +612,65 @@ CSS;
     typeFilterWrapper.hidden = false;
   }
 
+  function buildProxiedSrcset( srcset ) {
+    if ( 'string' !== typeof srcset || ! srcset.trim() ) {
+      return '';
+    }
+
+    const candidates = srcset.split( ',' );
+    const rewritten = candidates
+      .map( ( candidate ) => {
+        const trimmed = candidate.trim();
+
+        if ( ! trimmed ) {
+          return '';
+        }
+
+        const parts = trimmed.split( /\s+/ );
+
+        if ( ! parts.length ) {
+          return '';
+        }
+
+        const proxied = getProxiedImageUrl( parts[0] );
+
+        if ( ! proxied ) {
+          return trimmed;
+        }
+
+        return [ proxied ].concat( parts.slice( 1 ) ).join( ' ' );
+      } )
+      .filter( Boolean );
+
+    return rewritten.join( ', ' );
+  }
+
+  function getProxiedImageUrl( url ) {
+    if ( ! url ) {
+      return '';
+    }
+
+    let parsed;
+
+    try {
+      parsed = new URL( url );
+    } catch ( error ) {
+      return '';
+    }
+
+    const host = parsed.hostname.toLowerCase();
+
+    if ( 'images.weserv.nl' === host ) {
+      return '';
+    }
+
+    if ( ! host.endsWith( 'gundam-gcg.com' ) ) {
+      return '';
+    }
+
+    return 'https://images.weserv.nl/?url=' + encodeURIComponent( url );
+  }
+
   function renderCards() {
     if ( ! hasInteracted ) {
       resultsContainer.innerHTML = '';
@@ -650,13 +709,27 @@ CSS;
       item.className = 'tcg-kiosk__card';
 
       const img = document.createElement( 'img' );
-      img.src = card.imageUrl;
+      const proxiedUrl = getProxiedImageUrl( card.imageUrl );
+      img.src = proxiedUrl || card.imageUrl;
       img.alt = card.name || 'Trading card image';
       img.loading = 'lazy';
       img.decoding = 'async';
       img.referrerPolicy = 'no-referrer';
+      if ( proxiedUrl ) {
+        img.dataset.usingProxy = 'true';
+      } else {
+        delete img.dataset.usingProxy;
+      }
       if ( card.imageSrcset ) {
-        img.srcset = card.imageSrcset;
+        const proxiedSrcset = proxiedUrl ? buildProxiedSrcset( card.imageSrcset ) : '';
+
+        if ( proxiedSrcset ) {
+          img.srcset = proxiedSrcset;
+        } else if ( proxiedUrl ) {
+          img.removeAttribute( 'srcset' );
+        } else {
+          img.srcset = card.imageSrcset;
+        }
       }
       if ( card.imageSizes ) {
         img.sizes = card.imageSizes;
@@ -690,47 +763,65 @@ CSS;
   }
 
   function handleImageError( img, card ) {
-    const attempts = img.dataset.attempts ? img.dataset.attempts.split( ',' ) : [];
+    const attempts = img.dataset.attempts
+      ? img.dataset.attempts
+          .split( ',' )
+          .map( ( token ) => token.trim() )
+          .filter( Boolean )
+      : [];
+    const usingProxy = img.dataset.usingProxy === 'true';
 
-    if ( card.imageFullUrl && img.src !== card.imageFullUrl && ! attempts.includes( 'full' ) ) {
-      attempts.push( 'full' );
+    const recordAttempt = ( token ) => {
+      if ( attempts.includes( token ) ) {
+        return false;
+      }
+
+      attempts.push( token );
       img.dataset.attempts = attempts.join( ',' );
+      return true;
+    };
+
+    if ( ! usingProxy && card.imageFullUrl && img.src !== card.imageFullUrl && recordAttempt( 'full' ) ) {
       img.src = card.imageFullUrl;
       return;
     }
 
     const proxied = getProxiedImageUrl( card.imageFullUrl || card.imageUrl );
 
-    if ( proxied && img.src !== proxied && ! attempts.includes( 'proxy' ) ) {
-      attempts.push( 'proxy' );
-      img.dataset.attempts = attempts.join( ',' );
+    if ( proxied && img.src !== proxied && recordAttempt( 'proxy' ) ) {
+      img.dataset.usingProxy = 'true';
+      if ( card.imageSrcset ) {
+        const proxiedSrcset = buildProxiedSrcset( card.imageSrcset );
+
+        if ( proxiedSrcset ) {
+          img.srcset = proxiedSrcset;
+        } else {
+          img.removeAttribute( 'srcset' );
+        }
+      }
+
       img.src = proxied;
       return;
     }
 
-    img.dataset.attempts = attempts.concat( 'failed' ).join( ',' );
-  }
+    if ( usingProxy ) {
+      const origin = card.imageFullUrl || card.imageUrl;
 
-  function getProxiedImageUrl( url ) {
-    if ( ! url ) {
-      return '';
+      if ( origin && img.src !== origin && recordAttempt( 'origin' ) ) {
+        delete img.dataset.usingProxy;
+
+        if ( card.imageSrcset ) {
+          img.srcset = card.imageSrcset;
+        } else {
+          img.removeAttribute( 'srcset' );
+        }
+
+        img.src = origin;
+        return;
+      }
     }
 
-    let parsed;
-
-    try {
-      parsed = new URL( url );
-    } catch ( error ) {
-      return '';
-    }
-
-    const host = parsed.hostname.toLowerCase();
-
-    if ( ! host.endsWith( 'gundam-gcg.com' ) ) {
-      return '';
-    }
-
-    return 'https://images.weserv.nl/?url=' + encodeURIComponent( url );
+    recordAttempt( 'failed' );
   }
 
   function renderPagination( totalPages ) {
