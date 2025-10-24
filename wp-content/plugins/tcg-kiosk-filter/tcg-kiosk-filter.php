@@ -11,9 +11,10 @@ defined( 'ABSPATH' ) || exit;
 require_once __DIR__ . '/tcg-kiosk-database.php';
 
 class TCG_Kiosk_Filter_Plugin {
-    const SHORTCODE  = 'tcg_kiosk_browser';
-    const PAGE_SLUG  = 'tcg-kiosk-browser';
-    const PAGE_TITLE = 'TCG Kiosk Browser';
+    const SHORTCODE   = 'tcg_kiosk_browser';
+    const PAGE_SLUG   = 'tcg-kiosk-browser';
+    const PAGE_TITLE  = 'TCG Kiosk Browser';
+    const PAGE_OPTION = 'tcg_kiosk_browser_page_id';
 
     /**
      * Singleton instance.
@@ -51,6 +52,7 @@ class TCG_Kiosk_Filter_Plugin {
         register_activation_hook( __FILE__, array( $this, 'activate_plugin' ) );
         add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
         add_action( 'init', array( $this, 'register_shortcode' ) );
+        add_action( 'init', array( $this, 'ensure_page_exists' ) );
         add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ) );
     }
 
@@ -58,6 +60,24 @@ class TCG_Kiosk_Filter_Plugin {
      * Plugin activation callback.
      */
     public function activate_plugin() {
+        $this->ensure_page_exists();
+    }
+
+    /**
+     * Ensure the kiosk page exists and matches the expected content.
+     */
+    public function ensure_page_exists() {
+        $page_id = (int) get_option( self::PAGE_OPTION );
+
+        if ( $page_id ) {
+            $page = get_post( $page_id );
+
+            if ( $page instanceof WP_Post ) {
+                $this->synchronize_page( $page_id );
+                return;
+            }
+        }
+
         $this->maybe_create_page();
     }
 
@@ -100,12 +120,15 @@ class TCG_Kiosk_Filter_Plugin {
                 'cards'        => $data['cards'],
                 'lastModified' => $data['lastModified'],
                 'i18n'         => array(
-                    'allGames' => __( 'All Games', 'tcg-kiosk-filter' ),
                     'allSets'  => __( 'All Sets', 'tcg-kiosk-filter' ),
+                    'allTypeTemplate' => __( 'All %s', 'tcg-kiosk-filter' ),
                     'noCards'  => __( 'No cards match your filters.', 'tcg-kiosk-filter' ),
                     'previous' => __( 'Previous', 'tcg-kiosk-filter' ),
                     'next'     => __( 'Next', 'tcg-kiosk-filter' ),
                     'pageStatus' => __( 'Page %1$s of %2$s', 'tcg-kiosk-filter' ),
+                    'cardsPerPage' => __( 'Cards per page', 'tcg-kiosk-filter' ),
+                    'chooseGame' => __( 'Choose a game', 'tcg-kiosk-filter' ),
+                    'chooseGameSubtitle' => __( 'Select a game to start browsing cards.', 'tcg-kiosk-filter' ),
                 ),
             )
         );
@@ -122,21 +145,149 @@ class TCG_Kiosk_Filter_Plugin {
     --tcg-gap: 1.5rem;
     display: grid;
     gap: var(--tcg-gap);
+    height: 100vh;
+    max-height: 100dvh;
+    min-height: 100vh;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+}
+
+.tcg-kiosk__header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--tcg-gap);
 }
 
 .tcg-kiosk__filters {
+    flex: 0 0 25%;
     display: flex;
+    align-items: flex-end;
     flex-wrap: wrap;
     gap: 1rem;
-    align-items: flex-end;
+}
+
+.tcg-kiosk__type-filter {
+    flex: 1 1 50%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.tcg-kiosk__type-filter[hidden] {
+    display: none;
+}
+
+.tcg-kiosk__type-filter-label {
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.tcg-kiosk__type-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tcg-kiosk__overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background-color: rgba(0, 0, 0, 0.75);
+    z-index: 9999;
+}
+
+.tcg-kiosk__overlay[hidden] {
+    display: none;
+}
+
+.tcg-kiosk__overlay-panel {
+    max-width: 640px;
+    width: 100%;
+    background-color: #fff;
+    border-radius: 1rem;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+}
+
+.tcg-kiosk__overlay-title {
+    margin: 0 0 0.5rem;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1d2327;
+}
+
+.tcg-kiosk__overlay-subtitle {
+    margin: 0 0 2rem;
+    color: #50575e;
+    font-size: 1rem;
+}
+
+.tcg-kiosk__overlay-options {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.tcg-kiosk__overlay-button {
+    appearance: none;
+    border: none;
+    background: #2271b1;
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.85rem 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.tcg-kiosk__overlay-button:hover,
+.tcg-kiosk__overlay-button:focus {
+    background-color: #135e96;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 25px -10px rgba(19, 94, 150, 0.6);
+    outline: none;
+}
+
+.tcg-kiosk__overlay-button:focus-visible {
+    outline: 2px solid #f0b849;
+    outline-offset: 2px;
+}
+
+.tcg-kiosk__type-button {
+    border-radius: 999px;
+    border: 1px solid #ccd0d4;
+    background-color: #fff;
+    color: #1d2327;
+    padding: 0.35rem 0.9rem;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.tcg-kiosk__type-button:hover,
+.tcg-kiosk__type-button:focus {
+    border-color: #2271b1;
+    color: #135e96;
+    outline: none;
+}
+
+.tcg-kiosk__type-button.is-active {
+    background-color: #2271b1;
+    border-color: #0a4b78;
+    color: #fff;
 }
 
 .tcg-kiosk__filters label {
     display: flex;
     flex-direction: column;
+    flex: 1 1 0;
     font-weight: 600;
     color: #1d2327;
-    min-width: 180px;
 }
 
 .tcg-kiosk__select,
@@ -148,8 +299,19 @@ class TCG_Kiosk_Filter_Plugin {
     color: #1d2327;
 }
 
+.tcg-kiosk__select {
+    width: 100%;
+}
+
+
+.tcg-kiosk__actions {
+    flex: 0 0 25%;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
 .tcg-kiosk__search {
-    flex: 1 1 240px;
     position: relative;
 }
 
@@ -157,11 +319,61 @@ class TCG_Kiosk_Filter_Plugin {
     width: 100%;
 }
 
-.tcg-kiosk__grid {
-    display: grid;
-    gap: 1.5rem;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+.tcg-kiosk__page-size {
+    display: flex;
+    flex-direction: column;
+    font-weight: 600;
+    color: #1d2327;
 }
+
+.tcg-kiosk__page-size select {
+    margin-top: 0.35rem;
+}
+
+.tcg-kiosk__grid {
+    --tcg-card-columns: 5;
+    --tcg-card-rows: 2;
+    display: grid;
+    gap: var(--tcg-gap);
+    grid-template-columns: repeat(var(--tcg-card-columns), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--tcg-card-rows), minmax(0, 1fr));
+    align-items: stretch;
+    justify-items: stretch;
+    overflow: hidden;
+}
+
+.tcg-kiosk[data-page-size="10"] .tcg-kiosk__grid {
+    --tcg-card-columns: 5;
+    --tcg-card-rows: 2;
+}
+
+.tcg-kiosk[data-page-size="12"] {
+    --tcg-gap: 1.35rem;
+}
+
+.tcg-kiosk[data-page-size="12"] .tcg-kiosk__grid {
+    --tcg-card-columns: 6;
+    --tcg-card-rows: 2;
+}
+
+.tcg-kiosk[data-page-size="16"] {
+    --tcg-gap: 1.25rem;
+}
+
+.tcg-kiosk[data-page-size="16"] .tcg-kiosk__grid {
+    --tcg-card-columns: 8;
+    --tcg-card-rows: 2;
+}
+
+.tcg-kiosk[data-page-size="20"] {
+    --tcg-gap: 1.15rem;
+}
+
+.tcg-kiosk[data-page-size="20"] .tcg-kiosk__grid {
+    --tcg-card-columns: 10;
+    --tcg-card-rows: 2;
+}
+
 
 .tcg-kiosk__card {
     background: #fff;
@@ -170,26 +382,56 @@ class TCG_Kiosk_Filter_Plugin {
     box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
     overflow: hidden;
     padding: 1rem;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 0.75rem;
+    height: 100%;
+    min-height: 0;
+}
+
+.tcg-kiosk[data-page-size="16"] .tcg-kiosk__card,
+.tcg-kiosk[data-page-size="20"] .tcg-kiosk__card {
+    padding: 0.75rem;
+    gap: 0.5rem;
+}
+
+.tcg-kiosk[data-page-size="20"] .tcg-kiosk__card h3 {
+    font-size: 0.95rem;
+}
+
+.tcg-kiosk[data-page-size="16"] .tcg-kiosk__card h3 {
+    font-size: 0.98rem;
 }
 
 .tcg-kiosk__card img {
     width: 100%;
-    height: auto;
+    height: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
     border-radius: 4px;
     background: #f6f7f7;
+    object-fit: contain;
 }
 
 .tcg-kiosk__card h3 {
     margin: 0;
     font-size: 1rem;
+    flex: 0 0 auto;
 }
 
 .tcg-kiosk__meta {
     margin: 0;
     font-size: 0.875rem;
     color: #50575e;
+    margin-top: auto;
+}
+
+.tcg-kiosk[data-page-size="16"] .tcg-kiosk__meta {
+    font-size: 0.84rem;
+}
+
+.tcg-kiosk[data-page-size="20"] .tcg-kiosk__meta {
+    font-size: 0.8rem;
 }
 
 .tcg-kiosk__empty {
@@ -236,11 +478,21 @@ class TCG_Kiosk_Filter_Plugin {
     color: #1d2327;
 }
 
-@media (max-width: 600px) {
-    .tcg-kiosk__filters {
+@media (max-width: 900px) {
+    .tcg-kiosk__header {
         flex-direction: column;
         align-items: stretch;
     }
+
+    .tcg-kiosk__filters,
+    .tcg-kiosk__type-filter,
+    .tcg-kiosk__actions {
+        flex: 1 1 100%;
+    }
+}
+
+body.page-tcg-kiosk-browser .entry-title {
+    display: none;
 }
 CSS;
     }
@@ -257,21 +509,42 @@ CSS;
     return;
   }
 
-  const typeSelect = document.getElementById( 'tcg-kiosk-type' );
+  const kioskRoot = document.querySelector( '.tcg-kiosk' );
+  const gameSelect = document.getElementById( 'tcg-kiosk-game' );
   const setSelect = document.getElementById( 'tcg-kiosk-set' );
+  const typeFilterWrapper = document.getElementById( 'tcg-kiosk-type-filter' );
+  const typeFilterLabel = document.getElementById( 'tcg-kiosk-type-label' );
+  const typeOptionsContainer = document.getElementById( 'tcg-kiosk-type-options' );
   const searchInput = document.getElementById( 'tcg-kiosk-search' );
+  const pageSizeSelect = document.getElementById( 'tcg-kiosk-page-size' );
+  const pageSizeLabel = document.querySelector( 'label[for="tcg-kiosk-page-size"] span' );
   const resultsContainer = document.getElementById( 'tcg-kiosk-results' );
   const paginationContainer = document.getElementById( 'tcg-kiosk-pagination' );
+  const overlay = document.getElementById( 'tcg-kiosk-overlay' );
+  const overlayOptions = document.getElementById( 'tcg-kiosk-overlay-options' );
+  const overlayTitle = document.getElementById( 'tcg-kiosk-overlay-title' );
+  const overlaySubtitle = document.getElementById( 'tcg-kiosk-overlay-subtitle' );
 
-  if ( ! typeSelect || ! setSelect || ! searchInput || ! resultsContainer || ! paginationContainer ) {
+  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeFilterLabel || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
   }
 
   const data = window.tcgKioskData.cards;
   const i18n = window.tcgKioskData.i18n || {};
-  const CARDS_PER_PAGE = 10;
+  const DEFAULT_PAGE_SIZE = parseInt( pageSizeSelect.value, 10 ) || 10;
+  let cardsPerPage = DEFAULT_PAGE_SIZE;
   let hasInteracted = false;
   let currentPage = 1;
+  let selectedTypeValue = '';
+
+  function applyPageSizeLayout() {
+    const normalized = [ 10, 12, 16, 20 ].includes( cardsPerPage ) ? cardsPerPage : 10;
+    cardsPerPage = normalized;
+    kioskRoot.dataset.pageSize = String( normalized );
+    if ( pageSizeSelect.value !== String( normalized ) ) {
+      pageSizeSelect.value = String( normalized );
+    }
+  }
 
   function createOption( value, label ) {
     const option = document.createElement( 'option' );
@@ -280,33 +553,121 @@ CSS;
     return option;
   }
 
-  function populateTypeOptions() {
+  function populateGameOptions() {
     data.forEach( ( type ) => {
-      typeSelect.appendChild( createOption( type.slug, type.label ) );
+      if ( ! type || ! type.slug ) {
+        return;
+      }
+
+      gameSelect.appendChild( createOption( type.slug, type.label || type.slug ) );
     } );
   }
 
-  function getFilteredCards() {
-    const typeValue = typeSelect.value;
-    const setValue = setSelect.value;
-    const searchTerm = searchInput.value.trim().toLowerCase();
-    let filtered = [];
-
-    if ( typeValue ) {
-      filtered = data.filter( ( group ) => group.slug === typeValue );
-    } else {
-      filtered = data;
+  function hideOverlay() {
+    if ( ! overlay ) {
+      return;
     }
 
-    let cards = [];
-    filtered.forEach( ( group ) => {
-      if ( Array.isArray( group.cards ) ) {
-        cards = cards.concat( group.cards );
+    overlay.hidden = true;
+    overlay.setAttribute( 'aria-hidden', 'true' );
+  }
+
+  function showOverlay() {
+    if ( ! overlay ) {
+      return;
+    }
+
+    overlay.hidden = false;
+    overlay.removeAttribute( 'aria-hidden' );
+
+    const firstButton = overlay.querySelector( 'button' );
+
+    if ( firstButton ) {
+      firstButton.focus();
+    }
+  }
+
+  function handleOverlaySelection( slug ) {
+    if ( ! slug ) {
+      return;
+    }
+
+    hideOverlay();
+
+    const matchingOption = gameSelect.querySelector( 'option[value="' + slug + '"]' );
+
+    if ( matchingOption && matchingOption.disabled ) {
+      matchingOption.disabled = false;
+    }
+
+    if ( gameSelect.value !== slug ) {
+      gameSelect.value = slug;
+    }
+
+    gameSelect.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+    gameSelect.focus();
+  }
+
+  function populateOverlayOptions() {
+    if ( ! overlay || ! overlayOptions ) {
+      return;
+    }
+
+    overlayOptions.innerHTML = '';
+
+    if ( overlayTitle && i18n.chooseGame ) {
+      overlayTitle.textContent = i18n.chooseGame;
+    }
+
+    if ( overlaySubtitle ) {
+      const subtitle = i18n.chooseGameSubtitle || '';
+      overlaySubtitle.textContent = subtitle;
+      overlaySubtitle.hidden = ! subtitle;
+    }
+
+    data.forEach( ( type ) => {
+      if ( ! type || ! type.slug ) {
+        return;
       }
+
+      const button = document.createElement( 'button' );
+      button.type = 'button';
+      button.className = 'tcg-kiosk__overlay-button';
+      button.textContent = type.label || type.slug;
+      button.addEventListener( 'click', () => handleOverlaySelection( type.slug ) );
+      overlayOptions.appendChild( button );
     } );
+  }
+
+  function updatePageSizeLabel() {
+    if ( pageSizeLabel && i18n.cardsPerPage ) {
+      pageSizeLabel.textContent = i18n.cardsPerPage;
+    }
+  }
+
+  function getFilteredCards() {
+    const typeValue = gameSelect.value;
+    const setValue = setSelect.value;
+    const searchTerm = searchInput.value.trim().toLowerCase();
+
+    if ( ! typeValue ) {
+      return [];
+    }
+
+    const selectedGroup = data.find( ( group ) => group.slug === typeValue );
+
+    if ( ! selectedGroup ) {
+      return [];
+    }
+
+    let cards = Array.isArray( selectedGroup.cards ) ? selectedGroup.cards.slice() : [];
 
     if ( setValue ) {
       cards = cards.filter( ( card ) => card.set === setValue );
+    }
+
+    if ( selectedTypeValue ) {
+      cards = cards.filter( ( card ) => cardMatchesSelectedType( card, selectedGroup ) );
     }
 
     if ( searchTerm ) {
@@ -317,7 +678,7 @@ CSS;
   }
 
   function updateSetOptions() {
-    const typeValue = typeSelect.value;
+    const typeValue = gameSelect.value;
     setSelect.innerHTML = '';
     setSelect.appendChild( createOption( '', window.tcgKioskData.i18n?.allSets || setSelect.dataset.placeholder ) );
 
@@ -350,7 +711,229 @@ CSS;
     setSelect.disabled = sets.size === 0;
   }
 
+  function updateActiveTypeButton() {
+    const buttons = typeOptionsContainer.querySelectorAll( '.tcg-kiosk__type-button' );
+
+    buttons.forEach( ( button ) => {
+      const value = button.dataset.value || '';
+      const isActive = value ? value === selectedTypeValue : selectedTypeValue === '';
+      button.classList.toggle( 'is-active', isActive );
+      button.setAttribute( 'aria-pressed', isActive ? 'true' : 'false' );
+    } );
+  }
+
+  function createTypeButton( value, label ) {
+    const button = document.createElement( 'button' );
+    button.type = 'button';
+    button.className = 'tcg-kiosk__type-button';
+    button.dataset.value = value;
+    button.textContent = label;
+    button.setAttribute( 'aria-pressed', 'false' );
+    button.addEventListener( 'click', () => {
+      if ( value && selectedTypeValue === value ) {
+        selectedTypeValue = '';
+      } else {
+        selectedTypeValue = value;
+      }
+
+      hasInteracted = true;
+      currentPage = 1;
+      updateActiveTypeButton();
+      renderCards();
+    } );
+
+    return button;
+  }
+
+  function normalizeTypeValue( value, caseInsensitive ) {
+    if ( 'string' !== typeof value ) {
+      return '';
+    }
+
+    const cleaned = value.trim();
+
+    if ( ! cleaned ) {
+      return '';
+    }
+
+    return caseInsensitive ? cleaned.toLowerCase() : cleaned;
+  }
+
+  function cardMatchesSelectedType( card, group ) {
+    if ( ! group || ! Array.isArray( card.typeValues ) || ! card.typeValues.length ) {
+      return false;
+    }
+
+    const matchMode = group.typeMatchMode || 'exact';
+    const caseInsensitive = Boolean( group.typeCaseInsensitive );
+    const selection = normalizeTypeValue( selectedTypeValue, caseInsensitive );
+
+    if ( ! selection ) {
+      return false;
+    }
+
+    return card.typeValues.some( ( rawValue ) => {
+      const candidate = normalizeTypeValue( rawValue, caseInsensitive );
+
+      if ( ! candidate ) {
+        return false;
+      }
+
+      if ( 'contains' === matchMode ) {
+        return candidate.includes( selection );
+      }
+
+      return candidate === selection;
+    } );
+  }
+
+  function updateTypeOptions() {
+    selectedTypeValue = '';
+    typeOptionsContainer.innerHTML = '';
+    typeFilterWrapper.hidden = true;
+
+    const defaultLabel = typeFilterWrapper.dataset.defaultLabel || 'Type';
+    typeFilterLabel.textContent = defaultLabel;
+
+    const typeValue = gameSelect.value;
+
+    if ( ! typeValue ) {
+      return;
+    }
+
+    const selected = data.find( ( group ) => group.slug === typeValue );
+
+    if ( ! selected ) {
+      return;
+    }
+
+    const label = selected.typeLabel || defaultLabel;
+    typeFilterLabel.textContent = label;
+
+    const presetOptions = Array.isArray( selected.typeOptions ) ? selected.typeOptions : [];
+    const template = i18n.allTypeTemplate || 'All %s';
+    const allLabel = template.includes( '%s' ) ? template.replace( '%s', label ) : template;
+    const options = [];
+
+    if ( presetOptions.length ) {
+      presetOptions.forEach( ( option ) => {
+        if ( ! option ) {
+          return;
+        }
+
+        if ( 'string' === typeof option ) {
+          options.push( { value: option, label: option } );
+          return;
+        }
+
+        const value = option.value;
+
+        if ( ! value ) {
+          return;
+        }
+
+        options.push( { value, label: option.label || value } );
+      } );
+    } else {
+      const typeValues = new Set();
+
+      selected.cards.forEach( ( card ) => {
+        if ( Array.isArray( card.typeValues ) ) {
+          card.typeValues.forEach( ( value ) => {
+            if ( value ) {
+              typeValues.add( value );
+            }
+          } );
+        }
+      } );
+
+      if ( ! typeValues.size ) {
+        return;
+      }
+
+      Array.from( typeValues )
+        .sort( ( a, b ) => a.localeCompare( b ) )
+        .forEach( ( value ) => {
+          options.push( { value, label: value } );
+        } );
+    }
+
+    if ( ! options.length ) {
+      return;
+    }
+
+    typeOptionsContainer.appendChild( createTypeButton( '', allLabel ) );
+
+    options.forEach( ( option ) => {
+      typeOptionsContainer.appendChild( createTypeButton( option.value, option.label ) );
+    } );
+
+    updateActiveTypeButton();
+    typeFilterWrapper.hidden = false;
+  }
+
+  function buildProxiedSrcset( srcset ) {
+    if ( 'string' !== typeof srcset || ! srcset.trim() ) {
+      return '';
+    }
+
+    const candidates = srcset.split( ',' );
+    const rewritten = candidates
+      .map( ( candidate ) => {
+        const trimmed = candidate.trim();
+
+        if ( ! trimmed ) {
+          return '';
+        }
+
+        const parts = trimmed.split( /\s+/ );
+
+        if ( ! parts.length ) {
+          return '';
+        }
+
+        const proxied = getProxiedImageUrl( parts[0] );
+
+        if ( ! proxied ) {
+          return trimmed;
+        }
+
+        return [ proxied ].concat( parts.slice( 1 ) ).join( ' ' );
+      } )
+      .filter( Boolean );
+
+    return rewritten.join( ', ' );
+  }
+
+  function getProxiedImageUrl( url ) {
+    if ( ! url ) {
+      return '';
+    }
+
+    let parsed;
+
+    try {
+      parsed = new URL( url );
+    } catch ( error ) {
+      return '';
+    }
+
+    const host = parsed.hostname.toLowerCase();
+
+    if ( 'images.weserv.nl' === host ) {
+      return '';
+    }
+
+    if ( ! host.endsWith( 'gundam-gcg.com' ) ) {
+      return '';
+    }
+
+    return 'https://images.weserv.nl/?url=' + encodeURIComponent( url );
+  }
+
   function renderCards() {
+    applyPageSizeLayout();
+
     if ( ! hasInteracted ) {
       resultsContainer.innerHTML = '';
       renderPagination( 0 );
@@ -359,7 +942,7 @@ CSS;
 
     const cards = getFilteredCards();
 
-    const totalPages = Math.ceil( cards.length / CARDS_PER_PAGE );
+    const totalPages = Math.ceil( cards.length / cardsPerPage );
 
     if ( totalPages === 0 ) {
       currentPage = 1;
@@ -380,19 +963,45 @@ CSS;
 
     const fragment = document.createDocumentFragment();
 
-    const startIndex = ( currentPage - 1 ) * CARDS_PER_PAGE;
-    const pageCards = cards.slice( startIndex, startIndex + CARDS_PER_PAGE );
+    const startIndex = ( currentPage - 1 ) * cardsPerPage;
+    const pageCards = cards.slice( startIndex, startIndex + cardsPerPage );
 
-    pageCards.forEach( ( card ) => {
+    pageCards.forEach( ( card, index ) => {
       const item = document.createElement( 'article' );
       item.className = 'tcg-kiosk__card';
 
       const img = document.createElement( 'img' );
-      img.src = card.imageUrl;
+      const proxiedUrl = getProxiedImageUrl( card.imageUrl );
+      img.src = proxiedUrl || card.imageUrl;
       img.alt = card.name || 'Trading card image';
       img.loading = 'lazy';
       img.decoding = 'async';
       img.referrerPolicy = 'no-referrer';
+      if ( proxiedUrl ) {
+        img.dataset.usingProxy = 'true';
+      } else {
+        delete img.dataset.usingProxy;
+      }
+      if ( card.imageSrcset ) {
+        const proxiedSrcset = proxiedUrl ? buildProxiedSrcset( card.imageSrcset ) : '';
+
+        if ( proxiedSrcset ) {
+          img.srcset = proxiedSrcset;
+        } else if ( proxiedUrl ) {
+          img.removeAttribute( 'srcset' );
+        } else {
+          img.srcset = card.imageSrcset;
+        }
+      }
+      if ( card.imageSizes ) {
+        img.sizes = card.imageSizes;
+      }
+      if ( card.imageFullUrl && card.imageFullUrl !== card.imageUrl ) {
+        img.dataset.fullSrc = card.imageFullUrl;
+      }
+      if ( 0 === startIndex && index < 2 ) {
+        img.fetchPriority = 'high';
+      }
       img.addEventListener( 'error', () => handleImageError( img, card ) );
 
       const name = document.createElement( 'h3' );
@@ -416,40 +1025,65 @@ CSS;
   }
 
   function handleImageError( img, card ) {
-    if ( img.dataset.retry ) {
+    const attempts = img.dataset.attempts
+      ? img.dataset.attempts
+          .split( ',' )
+          .map( ( token ) => token.trim() )
+          .filter( Boolean )
+      : [];
+    const usingProxy = img.dataset.usingProxy === 'true';
+
+    const recordAttempt = ( token ) => {
+      if ( attempts.includes( token ) ) {
+        return false;
+      }
+
+      attempts.push( token );
+      img.dataset.attempts = attempts.join( ',' );
+      return true;
+    };
+
+    if ( ! usingProxy && card.imageFullUrl && img.src !== card.imageFullUrl && recordAttempt( 'full' ) ) {
+      img.src = card.imageFullUrl;
       return;
     }
 
-    const proxied = getProxiedImageUrl( card.imageUrl );
+    const proxied = getProxiedImageUrl( card.imageFullUrl || card.imageUrl );
 
-    if ( proxied ) {
-      img.dataset.retry = 'true';
+    if ( proxied && img.src !== proxied && recordAttempt( 'proxy' ) ) {
+      img.dataset.usingProxy = 'true';
+      if ( card.imageSrcset ) {
+        const proxiedSrcset = buildProxiedSrcset( card.imageSrcset );
+
+        if ( proxiedSrcset ) {
+          img.srcset = proxiedSrcset;
+        } else {
+          img.removeAttribute( 'srcset' );
+        }
+      }
+
       img.src = proxied;
-    } else {
-      img.dataset.retry = 'failed';
-    }
-  }
-
-  function getProxiedImageUrl( url ) {
-    if ( ! url ) {
-      return '';
+      return;
     }
 
-    let parsed;
+    if ( usingProxy ) {
+      const origin = card.imageFullUrl || card.imageUrl;
 
-    try {
-      parsed = new URL( url );
-    } catch ( error ) {
-      return '';
+      if ( origin && img.src !== origin && recordAttempt( 'origin' ) ) {
+        delete img.dataset.usingProxy;
+
+        if ( card.imageSrcset ) {
+          img.srcset = card.imageSrcset;
+        } else {
+          img.removeAttribute( 'srcset' );
+        }
+
+        img.src = origin;
+        return;
+      }
     }
 
-    const host = parsed.hostname.toLowerCase();
-
-    if ( ! host.endsWith( 'gundam-gcg.com' ) ) {
-      return '';
-    }
-
-    return 'https://images.weserv.nl/?url=' + encodeURIComponent( url );
+    recordAttempt( 'failed' );
   }
 
   function renderPagination( totalPages ) {
@@ -496,10 +1130,11 @@ CSS;
     paginationContainer.appendChild( nextButton );
   }
 
-  typeSelect.addEventListener( 'change', () => {
+  gameSelect.addEventListener( 'change', () => {
     hasInteracted = true;
     currentPage = 1;
     updateSetOptions();
+    updateTypeOptions();
     renderCards();
   } );
 
@@ -515,15 +1150,41 @@ CSS;
     renderCards();
   } );
 
-  const placeholders = i18n;
-  typeSelect.dataset.placeholder = placeholders.allGames || typeSelect.dataset.placeholder;
-  setSelect.dataset.placeholder = placeholders.allSets || setSelect.dataset.placeholder;
-  typeSelect.querySelector( 'option[value=""]' ).textContent = typeSelect.dataset.placeholder;
-  setSelect.querySelector( 'option[value=""]' ).textContent = setSelect.dataset.placeholder;
+  pageSizeSelect.addEventListener( 'change', () => {
+    const requested = parseInt( pageSizeSelect.value, 10 );
 
-  populateTypeOptions();
+    if ( Number.isInteger( requested ) ) {
+      cardsPerPage = requested;
+      applyPageSizeLayout();
+      hasInteracted = true;
+      currentPage = 1;
+      renderCards();
+    }
+  } );
+
+  const placeholders = i18n;
+  if ( setSelect.dataset ) {
+    setSelect.dataset.placeholder = placeholders.allSets || setSelect.dataset.placeholder;
+  }
+
+  const setPlaceholderOption = setSelect.querySelector( 'option[value=""]' );
+
+  if ( setPlaceholderOption ) {
+    setPlaceholderOption.textContent = setSelect.dataset.placeholder || placeholders.allSets || 'All Sets';
+  }
+
+  updatePageSizeLabel();
+  populateGameOptions();
+  populateOverlayOptions();
   updateSetOptions();
+  updateTypeOptions();
+  applyPageSizeLayout();
   renderPagination( 0 );
+  if ( gameSelect.value ) {
+    hideOverlay();
+  } else {
+    showOverlay();
+  }
 })();
 JS;
     }
@@ -536,25 +1197,49 @@ JS;
     public function render_shortcode() {
         ob_start();
         ?>
-        <div class="tcg-kiosk">
-            <div class="tcg-kiosk__filters">
-                <label>
-                    <span><?php esc_html_e( 'Trading Card Game', 'tcg-kiosk-filter' ); ?></span>
-                    <select id="tcg-kiosk-type" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Games', 'tcg-kiosk-filter' ); ?>">
-                        <option value=""><?php esc_html_e( 'All Games', 'tcg-kiosk-filter' ); ?></option>
-                    </select>
-                </label>
-                <label>
-                    <span><?php esc_html_e( 'Set', 'tcg-kiosk-filter' ); ?></span>
-                    <select id="tcg-kiosk-set" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Sets', 'tcg-kiosk-filter' ); ?>" disabled>
-                        <option value=""><?php esc_html_e( 'All Sets', 'tcg-kiosk-filter' ); ?></option>
-                    </select>
-                </label>
-                <label class="tcg-kiosk__search">
-                    <span class="screen-reader-text"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></span>
-                    <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
-                </label>
+        <div class="tcg-kiosk" data-page-size="10">
+            <div id="tcg-kiosk-overlay" class="tcg-kiosk__overlay" role="dialog" aria-modal="true" aria-labelledby="tcg-kiosk-overlay-title" aria-describedby="tcg-kiosk-overlay-subtitle" hidden>
+                <div class="tcg-kiosk__overlay-panel">
+                    <h2 id="tcg-kiosk-overlay-title" class="tcg-kiosk__overlay-title"><?php esc_html_e( 'Choose a game', 'tcg-kiosk-filter' ); ?></h2>
+                    <p id="tcg-kiosk-overlay-subtitle" class="tcg-kiosk__overlay-subtitle"><?php esc_html_e( 'Select a game to start browsing cards.', 'tcg-kiosk-filter' ); ?></p>
+                    <div id="tcg-kiosk-overlay-options" class="tcg-kiosk__overlay-options" role="group" aria-label="<?php esc_attr_e( 'Available games', 'tcg-kiosk-filter' ); ?>"></div>
+                </div>
             </div>
+            <header class="tcg-kiosk__header">
+                <div class="tcg-kiosk__filters" role="group" aria-label="<?php esc_attr_e( 'Filter cards', 'tcg-kiosk-filter' ); ?>">
+                    <label>
+                        <span><?php esc_html_e( 'Trading Card Game', 'tcg-kiosk-filter' ); ?></span>
+                        <select id="tcg-kiosk-game" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'Choose a game', 'tcg-kiosk-filter' ); ?>">
+                            <option value="" disabled selected hidden><?php esc_html_e( 'Choose a game', 'tcg-kiosk-filter' ); ?></option>
+                        </select>
+                    </label>
+                    <label>
+                        <span><?php esc_html_e( 'Set', 'tcg-kiosk-filter' ); ?></span>
+                        <select id="tcg-kiosk-set" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Sets', 'tcg-kiosk-filter' ); ?>" disabled>
+                            <option value=""><?php esc_html_e( 'All Sets', 'tcg-kiosk-filter' ); ?></option>
+                        </select>
+                    </label>
+                </div>
+                <div id="tcg-kiosk-type-filter" class="tcg-kiosk__type-filter" role="group" aria-labelledby="tcg-kiosk-type-label" data-default-label="<?php echo esc_attr__( 'Type', 'tcg-kiosk-filter' ); ?>" hidden>
+                    <span id="tcg-kiosk-type-label" class="tcg-kiosk__type-filter-label"><?php esc_html_e( 'Type', 'tcg-kiosk-filter' ); ?></span>
+                    <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
+                </div>
+                <div class="tcg-kiosk__actions">
+                    <div class="tcg-kiosk__search" role="search">
+                        <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
+                        <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
+                    </div>
+                    <label class="tcg-kiosk__page-size" for="tcg-kiosk-page-size">
+                        <span><?php esc_html_e( 'Cards per page', 'tcg-kiosk-filter' ); ?></span>
+                        <select id="tcg-kiosk-page-size" class="tcg-kiosk__select">
+                            <option value="10" selected>10</option>
+                            <option value="12">12</option>
+                            <option value="16">16</option>
+                            <option value="20">20</option>
+                        </select>
+                    </label>
+                </div>
+            </header>
             <div id="tcg-kiosk-results" class="tcg-kiosk__grid" aria-live="polite"></div>
             <nav id="tcg-kiosk-pagination" class="tcg-kiosk__pagination" aria-label="<?php esc_attr_e( 'Card results pagination', 'tcg-kiosk-filter' ); ?>" hidden></nav>
         </div>
@@ -568,7 +1253,24 @@ JS;
     protected function maybe_create_page() {
         $page = get_page_by_path( self::PAGE_SLUG );
 
-        if ( $page ) {
+        if ( $page instanceof WP_Post ) {
+            $this->synchronize_page( $page->ID );
+            return;
+        }
+
+        $trashed_page = get_posts(
+            array(
+                'post_type'      => 'page',
+                'post_status'    => 'trash',
+                'name'           => self::PAGE_SLUG,
+                'posts_per_page' => 1,
+            )
+        );
+
+        if ( ! empty( $trashed_page ) ) {
+            $page_id = (int) $trashed_page[0]->ID;
+            wp_untrash_post( $page_id );
+            $this->synchronize_page( $page_id );
             return;
         }
 
@@ -585,6 +1287,57 @@ JS;
         if ( is_wp_error( $page_id ) ) {
             return;
         }
+
+        update_option( self::PAGE_OPTION, (int) $page_id );
+    }
+
+    /**
+     * Normalise the kiosk page content, slug and publication status.
+     *
+     * @param int $page_id Page identifier to synchronise.
+     */
+    protected function synchronize_page( $page_id ) {
+        $page = get_post( $page_id );
+
+        if ( ! $page instanceof WP_Post ) {
+            return;
+        }
+
+        if ( 'trash' === $page->post_status ) {
+            wp_untrash_post( $page_id );
+            $page = get_post( $page_id );
+        }
+
+        $update = array( 'ID' => $page_id );
+        $needs_update = false;
+
+        if ( self::PAGE_TITLE !== $page->post_title ) {
+            $update['post_title'] = self::PAGE_TITLE;
+            $needs_update         = true;
+        }
+
+        $expected_content = '[' . self::SHORTCODE . ']';
+
+        if ( $expected_content !== trim( $page->post_content ) ) {
+            $update['post_content'] = $expected_content;
+            $needs_update           = true;
+        }
+
+        if ( self::PAGE_SLUG !== $page->post_name ) {
+            $update['post_name'] = self::PAGE_SLUG;
+            $needs_update        = true;
+        }
+
+        if ( 'publish' !== $page->post_status ) {
+            $update['post_status'] = 'publish';
+            $needs_update          = true;
+        }
+
+        if ( $needs_update ) {
+            wp_update_post( $update );
+        }
+
+        update_option( self::PAGE_OPTION, (int) $page_id );
     }
 
     /**

@@ -53,16 +53,21 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
 
             foreach ( $directories as $directory ) {
                 $type_slug = basename( $directory );
-                $cards     = $this->collect_cards_from_directory( $directory );
+                $config    = $this->get_type_filter_config( $type_slug );
+                $cards     = $this->collect_cards_from_directory( $directory, $config );
 
                 if ( empty( $cards ) ) {
                     continue;
                 }
 
                 $data['cards'][] = array(
-                    'slug'  => $type_slug,
-                    'label' => $this->humanize_label( $type_slug ),
-                    'cards' => $cards,
+                    'slug'                => $type_slug,
+                    'label'               => $this->humanize_label( $type_slug ),
+                    'typeLabel'           => $config['label'],
+                    'typeOptions'         => $config['options'],
+                    'typeMatchMode'       => $config['match_mode'],
+                    'typeCaseInsensitive' => $config['case_insensitive'],
+                    'cards'               => $cards,
                 );
             }
 
@@ -78,7 +83,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          *
          * @return array
          */
-        protected function collect_cards_from_directory( $directory ) {
+        protected function collect_cards_from_directory( $directory, array $config ) {
             $cards_directory = trailingslashit( $directory ) . 'cards';
 
             if ( ! is_dir( $cards_directory ) ) {
@@ -116,22 +121,246 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         continue;
                     }
 
-                    $image_url = $this->extract_image_url( $card['images'] );
+                    $image_sources = $this->prepare_image_sources( $card['images'] );
 
-                    if ( empty( $image_url ) ) {
+                    if ( empty( $image_sources['primary'] ) ) {
                         continue;
                     }
 
                     $cards[] = array(
-                        'id'       => isset( $card['id'] ) ? (string) $card['id'] : '',
-                        'name'     => isset( $card['name'] ) ? (string) $card['name'] : '',
-                        'set'      => $this->derive_set_name( $file->getBasename( '.json' ) ),
-                        'imageUrl' => esc_url_raw( $image_url ),
+                        'id'           => isset( $card['id'] ) ? (string) $card['id'] : '',
+                        'name'         => isset( $card['name'] ) ? (string) $card['name'] : '',
+                        'set'          => $this->derive_set_name( $file->getBasename( '.json' ) ),
+                        'imageUrl'     => $image_sources['primary'],
+                        'imageFullUrl' => $image_sources['full'],
+                        'imageSrcset'  => $image_sources['srcset'],
+                        'imageSizes'   => $image_sources['sizes'],
+                        'typeValues'   => $this->extract_type_values( $card, $config ),
                     );
                 }
             }
 
             return $cards;
+        }
+
+        /**
+         * Derive the configuration for the type filter based on the game slug.
+         *
+         * @param string $type_slug Slug for the game directory.
+         *
+         * @return array
+         */
+        protected function get_type_filter_config( $type_slug ) {
+            $slug = strtolower( (string) $type_slug );
+
+            if ( false !== strpos( $slug, 'pokemon' ) ) {
+                return array(
+                    'label'            => __( 'Type', 'tcg-kiosk-filter' ),
+                    'field'            => 'types',
+                    'options'          => array(),
+                    'match_mode'       => 'exact',
+                    'case_insensitive' => false,
+                );
+            }
+
+            if ( false !== strpos( $slug, 'one-piece' ) ) {
+                return array(
+                    'label'            => __( 'Color', 'tcg-kiosk-filter' ),
+                    'field'            => 'color',
+                    'options'          => array(
+                        array(
+                            'value' => 'black',
+                            'label' => __( 'Black', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'blue',
+                            'label' => __( 'Blue', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'green',
+                            'label' => __( 'Green', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'purple',
+                            'label' => __( 'Purple', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'red',
+                            'label' => __( 'Red', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'yellow',
+                            'label' => __( 'Yellow', 'tcg-kiosk-filter' ),
+                        ),
+                    ),
+                    'match_mode'       => 'contains',
+                    'case_insensitive' => true,
+                );
+            }
+
+            if ( false !== strpos( $slug, 'gundam' ) ) {
+                return array(
+                    'label'            => __( 'Color', 'tcg-kiosk-filter' ),
+                    'field'            => 'color',
+                    'options'          => array(
+                        array(
+                            'value' => 'blue',
+                            'label' => __( 'Blue', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'green',
+                            'label' => __( 'Green', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'red',
+                            'label' => __( 'Red', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'white',
+                            'label' => __( 'White', 'tcg-kiosk-filter' ),
+                        ),
+                    ),
+                    'match_mode'       => 'contains',
+                    'case_insensitive' => true,
+                );
+            }
+
+            if ( false !== strpos( $slug, 'riftbound' ) ) {
+                return array(
+                    'label'            => __( 'Domain', 'tcg-kiosk-filter' ),
+                    'field'            => 'domain',
+                    'options'          => array(
+                        array(
+                            'value' => 'body',
+                            'label' => __( 'Body', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'calm',
+                            'label' => __( 'Calm', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'chaos',
+                            'label' => __( 'Chaos', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'fury',
+                            'label' => __( 'Fury', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'mind',
+                            'label' => __( 'Mind', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'order',
+                            'label' => __( 'Order', 'tcg-kiosk-filter' ),
+                        ),
+                        array(
+                            'value' => 'none',
+                            'label' => __( 'None', 'tcg-kiosk-filter' ),
+                        ),
+                    ),
+                    'match_mode'       => 'contains',
+                    'case_insensitive' => true,
+                );
+            }
+
+            return array(
+                'label'            => __( 'Type', 'tcg-kiosk-filter' ),
+                'field'            => '',
+                'options'          => array(),
+                'match_mode'       => 'exact',
+                'case_insensitive' => false,
+            );
+        }
+
+        /**
+         * Extract the relevant type values for a card based on the configuration.
+         *
+         * @param array $card   Raw card data.
+         * @param array $config Type filter configuration.
+         *
+         * @return array
+         */
+        protected function extract_type_values( array $card, array $config ) {
+            $values = array();
+
+            switch ( $config['field'] ) {
+                case 'types':
+                    if ( ! empty( $card['types'] ) && is_array( $card['types'] ) ) {
+                        $values = $card['types'];
+                    }
+                    break;
+                case 'color':
+                    if ( ! empty( $card['color'] ) ) {
+                        if ( is_array( $card['color'] ) ) {
+                            $values = $card['color'];
+                        } else {
+                            $values = array( $card['color'] );
+                        }
+                    }
+                    break;
+                case 'domain':
+                    if ( ! empty( $card['domain'] ) ) {
+                        $values = array( $card['domain'] );
+                    }
+                    break;
+            }
+
+            if ( empty( $values ) ) {
+                return array();
+            }
+
+            $normalized = array();
+
+            foreach ( $values as $value ) {
+                if ( is_string( $value ) || is_numeric( $value ) ) {
+                    $clean = trim( preg_replace( '/\s+/', ' ', (string) $value ) );
+
+                    if ( '' !== $clean ) {
+                        $normalized[] = $clean;
+                    }
+                }
+            }
+
+            if ( empty( $normalized ) ) {
+                return array();
+            }
+
+            $case_insensitive = ! empty( $config['case_insensitive'] );
+            $unique           = array();
+
+            foreach ( $normalized as $value ) {
+                $key = $case_insensitive ? $this->to_lower( $value ) : $value;
+
+                if ( '' === $key ) {
+                    continue;
+                }
+
+                if ( ! isset( $unique[ $key ] ) ) {
+                    $unique[ $key ] = $case_insensitive ? $key : $value;
+                }
+            }
+
+            if ( empty( $unique ) ) {
+                return array();
+            }
+
+            return array_values( $unique );
+        }
+
+        /**
+         * Normalize a value to lowercase, supporting multibyte strings when possible.
+         *
+         * @param string $value Input value.
+         *
+         * @return string
+         */
+        protected function to_lower( $value ) {
+            if ( function_exists( 'mb_strtolower' ) ) {
+                return mb_strtolower( $value, 'UTF-8' );
+            }
+
+            return strtolower( $value );
         }
 
         /**
@@ -141,14 +370,117 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          *
          * @return string
          */
-        protected function extract_image_url( array $images ) {
-            foreach ( array( 'large', 'small', 'normal', 'image' ) as $key ) {
-                if ( ! empty( $images[ $key ] ) ) {
-                    return $images[ $key ];
+        protected function prepare_image_sources( array $images ) {
+            $sources = array(
+                'primary' => '',
+                'full'    => '',
+                'srcset'  => '',
+                'sizes'   => '',
+            );
+
+            if ( empty( $images ) ) {
+                return $sources;
+            }
+
+            $map      = array(
+                'small'  => array(
+                    'descriptor' => '1x',
+                    'priority'   => 10,
+                ),
+                'normal' => array(
+                    'descriptor' => '1.5x',
+                    'priority'   => 20,
+                ),
+                'large'  => array(
+                    'descriptor' => '2x',
+                    'priority'   => 30,
+                ),
+                'image'  => array(
+                    'descriptor' => '3x',
+                    'priority'   => 40,
+                ),
+            );
+            $entries  = array();
+
+            foreach ( $map as $key => $meta ) {
+                if ( empty( $images[ $key ] ) || ! is_string( $images[ $key ] ) ) {
+                    continue;
+                }
+
+                $url = trim( $images[ $key ] );
+
+                if ( '' === $url ) {
+                    continue;
+                }
+
+                if ( '' === $sources['primary'] ) {
+                    $sources['primary'] = $url;
+                }
+
+                if ( in_array( $key, array( 'large', 'image' ), true ) ) {
+                    $sources['full'] = $url;
+                }
+
+                $entries[] = array(
+                    'priority'   => $meta['priority'],
+                    'descriptor' => $meta['descriptor'],
+                    'url'        => $url,
+                );
+            }
+
+            if ( '' === $sources['primary'] ) {
+                foreach ( $images as $image_url ) {
+                    if ( is_string( $image_url ) && '' !== trim( $image_url ) ) {
+                        $sources['primary'] = trim( $image_url );
+                        break;
+                    }
                 }
             }
 
-            return '';
+            if ( '' === $sources['full'] ) {
+                $sources['full'] = $sources['primary'];
+            }
+
+            if ( ! empty( $entries ) ) {
+                usort(
+                    $entries,
+                    static function ( $a, $b ) {
+                        return $a['priority'] <=> $b['priority'];
+                    }
+                );
+
+                $seen  = array();
+                $parts = array();
+
+                foreach ( $entries as $entry ) {
+                    if ( isset( $seen[ $entry['descriptor'] ] ) ) {
+                        continue;
+                    }
+
+                    $sanitized_url = esc_url_raw( $entry['url'] );
+
+                    if ( '' === $sanitized_url ) {
+                        continue;
+                    }
+
+                    $seen[ $entry['descriptor'] ] = true;
+                    $parts[]                       = $sanitized_url . ' ' . $entry['descriptor'];
+                }
+
+                if ( ! empty( $parts ) ) {
+                    $sources['srcset'] = implode( ', ', $parts );
+                    $sources['sizes']  = '(max-width: 600px) 80vw, (max-width: 900px) 40vw, 220px';
+                }
+            }
+
+            $sources['primary'] = esc_url_raw( $sources['primary'] );
+            $sources['full']    = esc_url_raw( $sources['full'] );
+
+            if ( '' === $sources['srcset'] ) {
+                $sources['sizes'] = '';
+            }
+
+            return $sources;
         }
 
         /**
