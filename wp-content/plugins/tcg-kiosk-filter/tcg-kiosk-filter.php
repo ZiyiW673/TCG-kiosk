@@ -153,13 +153,16 @@ class TCG_Kiosk_Filter_Plugin {
 
 .tcg-kiosk__filters {
     flex: 0 0 25%;
-    display: grid;
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
     gap: 1rem;
 }
 
 .tcg-kiosk__filters label {
     display: flex;
     flex-direction: column;
+    flex: 1 1 0;
     font-weight: 600;
     color: #1d2327;
 }
