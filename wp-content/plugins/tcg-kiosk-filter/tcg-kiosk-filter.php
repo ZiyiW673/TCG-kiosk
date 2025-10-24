@@ -122,6 +122,7 @@ class TCG_Kiosk_Filter_Plugin {
                 'i18n'         => array(
                     'allGames' => __( 'All Games', 'tcg-kiosk-filter' ),
                     'allSets'  => __( 'All Sets', 'tcg-kiosk-filter' ),
+                    'allTypeTemplate' => __( 'All %s', 'tcg-kiosk-filter' ),
                     'noCards'  => __( 'No cards match your filters.', 'tcg-kiosk-filter' ),
                     'previous' => __( 'Previous', 'tcg-kiosk-filter' ),
                     'next'     => __( 'Next', 'tcg-kiosk-filter' ),
@@ -146,8 +147,7 @@ class TCG_Kiosk_Filter_Plugin {
 
 .tcg-kiosk__header {
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
+    align-items: flex-start;
     gap: var(--tcg-gap);
 }
 
@@ -157,6 +157,52 @@ class TCG_Kiosk_Filter_Plugin {
     align-items: flex-end;
     flex-wrap: wrap;
     gap: 1rem;
+}
+
+.tcg-kiosk__type-filter {
+    flex: 1 1 50%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.tcg-kiosk__type-filter[hidden] {
+    display: none;
+}
+
+.tcg-kiosk__type-filter-label {
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.tcg-kiosk__type-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tcg-kiosk__type-button {
+    border-radius: 999px;
+    border: 1px solid #ccd0d4;
+    background-color: #fff;
+    color: #1d2327;
+    padding: 0.35rem 0.9rem;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.tcg-kiosk__type-button:hover,
+.tcg-kiosk__type-button:focus {
+    border-color: #2271b1;
+    color: #135e96;
+    outline: none;
+}
+
+.tcg-kiosk__type-button.is-active {
+    background-color: #2271b1;
+    border-color: #0a4b78;
+    color: #fff;
 }
 
 .tcg-kiosk__filters label {
@@ -275,6 +321,7 @@ class TCG_Kiosk_Filter_Plugin {
     }
 
     .tcg-kiosk__filters,
+    .tcg-kiosk__type-filter,
     .tcg-kiosk__search {
         flex: 1 1 100%;
     }
@@ -298,13 +345,16 @@ CSS;
     return;
   }
 
-  const typeSelect = document.getElementById( 'tcg-kiosk-type' );
+  const gameSelect = document.getElementById( 'tcg-kiosk-game' );
   const setSelect = document.getElementById( 'tcg-kiosk-set' );
+  const typeFilterWrapper = document.getElementById( 'tcg-kiosk-type-filter' );
+  const typeFilterLabel = document.getElementById( 'tcg-kiosk-type-label' );
+  const typeOptionsContainer = document.getElementById( 'tcg-kiosk-type-options' );
   const searchInput = document.getElementById( 'tcg-kiosk-search' );
   const resultsContainer = document.getElementById( 'tcg-kiosk-results' );
   const paginationContainer = document.getElementById( 'tcg-kiosk-pagination' );
 
-  if ( ! typeSelect || ! setSelect || ! searchInput || ! resultsContainer || ! paginationContainer ) {
+  if ( ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeFilterLabel || ! typeOptionsContainer || ! searchInput || ! resultsContainer || ! paginationContainer ) {
     return;
   }
 
@@ -313,6 +363,7 @@ CSS;
   const CARDS_PER_PAGE = 10;
   let hasInteracted = false;
   let currentPage = 1;
+  let selectedTypeValue = '';
 
   function createOption( value, label ) {
     const option = document.createElement( 'option' );
@@ -321,14 +372,14 @@ CSS;
     return option;
   }
 
-  function populateTypeOptions() {
+  function populateGameOptions() {
     data.forEach( ( type ) => {
-      typeSelect.appendChild( createOption( type.slug, type.label ) );
+      gameSelect.appendChild( createOption( type.slug, type.label ) );
     } );
   }
 
   function getFilteredCards() {
-    const typeValue = typeSelect.value;
+    const typeValue = gameSelect.value;
     const setValue = setSelect.value;
     const searchTerm = searchInput.value.trim().toLowerCase();
     let filtered = [];
@@ -350,6 +401,16 @@ CSS;
       cards = cards.filter( ( card ) => card.set === setValue );
     }
 
+    if ( selectedTypeValue ) {
+      cards = cards.filter( ( card ) => {
+        if ( ! Array.isArray( card.typeValues ) || ! card.typeValues.length ) {
+          return false;
+        }
+
+        return card.typeValues.some( ( value ) => value === selectedTypeValue );
+      } );
+    }
+
     if ( searchTerm ) {
       cards = cards.filter( ( card ) => card.name.toLowerCase().includes( searchTerm ) );
     }
@@ -358,7 +419,7 @@ CSS;
   }
 
   function updateSetOptions() {
-    const typeValue = typeSelect.value;
+    const typeValue = gameSelect.value;
     setSelect.innerHTML = '';
     setSelect.appendChild( createOption( '', window.tcgKioskData.i18n?.allSets || setSelect.dataset.placeholder ) );
 
@@ -389,6 +450,93 @@ CSS;
       } );
 
     setSelect.disabled = sets.size === 0;
+  }
+
+  function updateActiveTypeButton() {
+    const buttons = typeOptionsContainer.querySelectorAll( '.tcg-kiosk__type-button' );
+
+    buttons.forEach( ( button ) => {
+      const value = button.dataset.value || '';
+      const isActive = value ? value === selectedTypeValue : selectedTypeValue === '';
+      button.classList.toggle( 'is-active', isActive );
+      button.setAttribute( 'aria-pressed', isActive ? 'true' : 'false' );
+    } );
+  }
+
+  function createTypeButton( value, label ) {
+    const button = document.createElement( 'button' );
+    button.type = 'button';
+    button.className = 'tcg-kiosk__type-button';
+    button.dataset.value = value;
+    button.textContent = label;
+    button.setAttribute( 'aria-pressed', 'false' );
+    button.addEventListener( 'click', () => {
+      if ( value && selectedTypeValue === value ) {
+        selectedTypeValue = '';
+      } else {
+        selectedTypeValue = value;
+      }
+
+      hasInteracted = true;
+      currentPage = 1;
+      updateActiveTypeButton();
+      renderCards();
+    } );
+
+    return button;
+  }
+
+  function updateTypeOptions() {
+    selectedTypeValue = '';
+    typeOptionsContainer.innerHTML = '';
+    typeFilterWrapper.hidden = true;
+
+    const defaultLabel = typeFilterWrapper.dataset.defaultLabel || 'Type';
+    typeFilterLabel.textContent = defaultLabel;
+
+    const typeValue = gameSelect.value;
+
+    if ( ! typeValue ) {
+      return;
+    }
+
+    const selected = data.find( ( group ) => group.slug === typeValue );
+
+    if ( ! selected ) {
+      return;
+    }
+
+    const label = selected.typeLabel || defaultLabel;
+    typeFilterLabel.textContent = label;
+
+    const typeValues = new Set();
+
+    selected.cards.forEach( ( card ) => {
+      if ( Array.isArray( card.typeValues ) ) {
+        card.typeValues.forEach( ( value ) => {
+          if ( value ) {
+            typeValues.add( value );
+          }
+        } );
+      }
+    } );
+
+    if ( ! typeValues.size ) {
+      return;
+    }
+
+    const template = i18n.allTypeTemplate || 'All %s';
+    const allLabel = template.includes( '%s' ) ? template.replace( '%s', label ) : template;
+    typeOptionsContainer.appendChild( createTypeButton( '', allLabel ) );
+
+    Array.from( typeValues )
+      .sort( ( a, b ) => a.localeCompare( b ) )
+      .forEach( ( value ) => {
+        typeOptionsContainer.appendChild( createTypeButton( value, value ) );
+      } );
+
+    updateActiveTypeButton();
+    typeFilterWrapper.hidden = false;
   }
 
   function renderCards() {
@@ -537,10 +685,11 @@ CSS;
     paginationContainer.appendChild( nextButton );
   }
 
-  typeSelect.addEventListener( 'change', () => {
+  gameSelect.addEventListener( 'change', () => {
     hasInteracted = true;
     currentPage = 1;
     updateSetOptions();
+    updateTypeOptions();
     renderCards();
   } );
 
@@ -557,13 +706,14 @@ CSS;
   } );
 
   const placeholders = i18n;
-  typeSelect.dataset.placeholder = placeholders.allGames || typeSelect.dataset.placeholder;
+  gameSelect.dataset.placeholder = placeholders.allGames || gameSelect.dataset.placeholder;
   setSelect.dataset.placeholder = placeholders.allSets || setSelect.dataset.placeholder;
-  typeSelect.querySelector( 'option[value=""]' ).textContent = typeSelect.dataset.placeholder;
+  gameSelect.querySelector( 'option[value=""]' ).textContent = gameSelect.dataset.placeholder;
   setSelect.querySelector( 'option[value=""]' ).textContent = setSelect.dataset.placeholder;
 
-  populateTypeOptions();
+  populateGameOptions();
   updateSetOptions();
+  updateTypeOptions();
   renderPagination( 0 );
 })();
 JS;
@@ -582,7 +732,7 @@ JS;
                 <div class="tcg-kiosk__filters" role="group" aria-label="<?php esc_attr_e( 'Filter cards', 'tcg-kiosk-filter' ); ?>">
                     <label>
                         <span><?php esc_html_e( 'Trading Card Game', 'tcg-kiosk-filter' ); ?></span>
-                        <select id="tcg-kiosk-type" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Games', 'tcg-kiosk-filter' ); ?>">
+                        <select id="tcg-kiosk-game" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Games', 'tcg-kiosk-filter' ); ?>">
                             <option value=""><?php esc_html_e( 'All Games', 'tcg-kiosk-filter' ); ?></option>
                         </select>
                     </label>
@@ -592,6 +742,10 @@ JS;
                             <option value=""><?php esc_html_e( 'All Sets', 'tcg-kiosk-filter' ); ?></option>
                         </select>
                     </label>
+                </div>
+                <div id="tcg-kiosk-type-filter" class="tcg-kiosk__type-filter" role="group" aria-labelledby="tcg-kiosk-type-label" data-default-label="<?php echo esc_attr__( 'Type', 'tcg-kiosk-filter' ); ?>" hidden>
+                    <span id="tcg-kiosk-type-label" class="tcg-kiosk__type-filter-label"><?php esc_html_e( 'Type', 'tcg-kiosk-filter' ); ?></span>
+                    <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
                 </div>
                 <div class="tcg-kiosk__search" role="search">
                     <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>

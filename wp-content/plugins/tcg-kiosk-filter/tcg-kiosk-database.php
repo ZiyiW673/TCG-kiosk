@@ -53,7 +53,8 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
 
             foreach ( $directories as $directory ) {
                 $type_slug = basename( $directory );
-                $cards     = $this->collect_cards_from_directory( $directory );
+                $config    = $this->get_type_filter_config( $type_slug );
+                $cards     = $this->collect_cards_from_directory( $directory, $config );
 
                 if ( empty( $cards ) ) {
                     continue;
@@ -62,6 +63,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 $data['cards'][] = array(
                     'slug'  => $type_slug,
                     'label' => $this->humanize_label( $type_slug ),
+                    'typeLabel' => $config['label'],
                     'cards' => $cards,
                 );
             }
@@ -78,7 +80,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          *
          * @return array
          */
-        protected function collect_cards_from_directory( $directory ) {
+        protected function collect_cards_from_directory( $directory, array $config ) {
             $cards_directory = trailingslashit( $directory ) . 'cards';
 
             if ( ! is_dir( $cards_directory ) ) {
@@ -123,15 +125,116 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     }
 
                     $cards[] = array(
-                        'id'       => isset( $card['id'] ) ? (string) $card['id'] : '',
-                        'name'     => isset( $card['name'] ) ? (string) $card['name'] : '',
-                        'set'      => $this->derive_set_name( $file->getBasename( '.json' ) ),
-                        'imageUrl' => esc_url_raw( $image_url ),
+                        'id'         => isset( $card['id'] ) ? (string) $card['id'] : '',
+                        'name'       => isset( $card['name'] ) ? (string) $card['name'] : '',
+                        'set'        => $this->derive_set_name( $file->getBasename( '.json' ) ),
+                        'imageUrl'   => esc_url_raw( $image_url ),
+                        'typeValues' => $this->extract_type_values( $card, $config ),
                     );
                 }
             }
 
             return $cards;
+        }
+
+        /**
+         * Derive the configuration for the type filter based on the game slug.
+         *
+         * @param string $type_slug Slug for the game directory.
+         *
+         * @return array
+         */
+        protected function get_type_filter_config( $type_slug ) {
+            $slug = strtolower( (string) $type_slug );
+
+            if ( false !== strpos( $slug, 'pokemon' ) ) {
+                return array(
+                    'label' => __( 'Type', 'tcg-kiosk-filter' ),
+                    'field' => 'types',
+                );
+            }
+
+            if ( false !== strpos( $slug, 'one-piece' ) ) {
+                return array(
+                    'label' => __( 'Color', 'tcg-kiosk-filter' ),
+                    'field' => 'color',
+                );
+            }
+
+            if ( false !== strpos( $slug, 'gundam' ) ) {
+                return array(
+                    'label' => __( 'Color', 'tcg-kiosk-filter' ),
+                    'field' => 'color',
+                );
+            }
+
+            if ( false !== strpos( $slug, 'riftbound' ) ) {
+                return array(
+                    'label' => __( 'Domain', 'tcg-kiosk-filter' ),
+                    'field' => 'domain',
+                );
+            }
+
+            return array(
+                'label' => __( 'Type', 'tcg-kiosk-filter' ),
+                'field' => '',
+            );
+        }
+
+        /**
+         * Extract the relevant type values for a card based on the configuration.
+         *
+         * @param array $card   Raw card data.
+         * @param array $config Type filter configuration.
+         *
+         * @return array
+         */
+        protected function extract_type_values( array $card, array $config ) {
+            $values = array();
+
+            switch ( $config['field'] ) {
+                case 'types':
+                    if ( ! empty( $card['types'] ) && is_array( $card['types'] ) ) {
+                        $values = $card['types'];
+                    }
+                    break;
+                case 'color':
+                    if ( ! empty( $card['color'] ) ) {
+                        if ( is_array( $card['color'] ) ) {
+                            $values = $card['color'];
+                        } else {
+                            $values = array( $card['color'] );
+                        }
+                    }
+                    break;
+                case 'domain':
+                    if ( ! empty( $card['domain'] ) ) {
+                        $values = array( $card['domain'] );
+                    }
+                    break;
+            }
+
+            if ( empty( $values ) ) {
+                return array();
+            }
+
+            $normalized = array();
+
+            foreach ( $values as $value ) {
+                if ( is_string( $value ) || is_numeric( $value ) ) {
+                    $clean = trim( preg_replace( '/\s+/', ' ', (string) $value ) );
+
+                    if ( '' !== $clean ) {
+                        $normalized[] = $clean;
+                    }
+                }
+            }
+
+            if ( empty( $normalized ) ) {
+                return array();
+            }
+
+            return array_values( array_unique( $normalized ) );
         }
 
         /**
