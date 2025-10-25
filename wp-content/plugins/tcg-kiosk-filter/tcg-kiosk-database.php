@@ -54,7 +54,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             foreach ( $directories as $directory ) {
                 $type_slug = basename( $directory );
                 $config    = $this->get_type_filter_config( $type_slug );
-                $cards     = $this->collect_cards_from_directory( $directory, $config );
+                $cards     = $this->collect_cards_from_directory( $directory, $config, $type_slug );
 
                 if ( empty( $cards ) ) {
                     continue;
@@ -83,7 +83,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          *
          * @return array
          */
-        protected function collect_cards_from_directory( $directory, array $config ) {
+        protected function collect_cards_from_directory( $directory, array $config, $type_slug ) {
             $cards_directory = trailingslashit( $directory ) . 'cards';
 
             if ( ! is_dir( $cards_directory ) ) {
@@ -91,6 +91,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             }
 
             $cards = array();
+            $game  = $this->humanize_label( $type_slug );
 
             $iterator = new RecursiveIteratorIterator(
                 new RecursiveDirectoryIterator(
@@ -127,15 +128,19 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         continue;
                     }
 
+                    $set_name = $this->derive_set_name( $file->getBasename( '.json' ) );
+
                     $cards[] = array(
                         'id'           => isset( $card['id'] ) ? (string) $card['id'] : '',
                         'name'         => isset( $card['name'] ) ? (string) $card['name'] : '',
-                        'set'          => $this->derive_set_name( $file->getBasename( '.json' ) ),
+                        'game'         => $game,
+                        'set'          => $set_name,
                         'imageUrl'     => $image_sources['primary'],
                         'imageFullUrl' => $image_sources['full'],
                         'imageSrcset'  => $image_sources['srcset'],
                         'imageSizes'   => $image_sources['sizes'],
                         'typeValues'   => $this->extract_type_values( $card, $config ),
+                        'details'      => $this->prepare_card_details( $card, $set_name, $game ),
                     );
                 }
             }
@@ -319,6 +324,150 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             }
 
             return array_values( $unique );
+        }
+
+        /**
+         * Build a list of human readable details for the provided card.
+         *
+         * @param array  $card     Raw card payload.
+         * @param string $set_name Derived set name from the file path.
+         * @param string $game     Human readable game name.
+         *
+         * @return array
+         */
+        protected function prepare_card_details( array $card, $set_name, $game ) {
+            $details = array();
+
+            $this->append_detail( $details, __( 'Game', 'tcg-kiosk-filter' ), $game );
+            $this->append_detail( $details, __( 'Source Set', 'tcg-kiosk-filter' ), $set_name );
+
+            foreach ( $card as $key => $value ) {
+                if ( in_array( $key, array( 'images' ), true ) ) {
+                    continue;
+                }
+
+                $label = $this->humanize_label( $key );
+                $text  = $this->normalize_detail_value( $value );
+
+                if ( '' === $label || '' === $text ) {
+                    continue;
+                }
+
+                $this->append_detail( $details, $label, $text );
+            }
+
+            return $details;
+        }
+
+        /**
+         * Append a formatted detail entry to the list.
+         *
+         * @param array  $details Reference to the detail list.
+         * @param string $label   Detail label.
+         * @param string $value   Detail value.
+         */
+        protected function append_detail( array &$details, $label, $value ) {
+            $label = is_string( $label ) ? trim( $label ) : '';
+            $value = is_string( $value ) ? trim( $value ) : '';
+
+            if ( '' === $label || '' === $value ) {
+                return;
+            }
+
+            $details[] = array(
+                'label' => $label,
+                'value' => $value,
+            );
+        }
+
+        /**
+         * Convert a raw card value into a human readable string.
+         *
+         * @param mixed $value Raw value.
+         *
+         * @return string
+         */
+        protected function normalize_detail_value( $value ) {
+            if ( null === $value ) {
+                return '';
+            }
+
+            if ( is_bool( $value ) ) {
+                return $value ? __( 'Yes', 'tcg-kiosk-filter' ) : __( 'No', 'tcg-kiosk-filter' );
+            }
+
+            if ( is_scalar( $value ) ) {
+                $string = trim( (string) $value );
+
+                return $string;
+            }
+
+            if ( is_array( $value ) ) {
+                if ( empty( $value ) ) {
+                    return '';
+                }
+
+                if ( $this->is_associative_array( $value ) ) {
+                    $parts = array();
+
+                    foreach ( $value as $key => $item ) {
+                        $normalized = $this->normalize_detail_value( $item );
+
+                        if ( '' === $normalized ) {
+                            continue;
+                        }
+
+                        $label = is_string( $key ) ? $this->humanize_label( $key ) : '';
+
+                        if ( '' !== $label ) {
+                            $parts[] = $label . ': ' . $normalized;
+                        } else {
+                            $parts[] = $normalized;
+                        }
+                    }
+
+                    if ( empty( $parts ) ) {
+                        return '';
+                    }
+
+                    return implode( '; ', $parts );
+                }
+
+                $parts = array();
+
+                foreach ( $value as $item ) {
+                    $normalized = $this->normalize_detail_value( $item );
+
+                    if ( '' === $normalized ) {
+                        continue;
+                    }
+
+                    $parts[] = $normalized;
+                }
+
+                if ( empty( $parts ) ) {
+                    return '';
+                }
+
+                return implode( "\n", $parts );
+            }
+
+            return '';
+        }
+
+        /**
+         * Determine if an array is associative.
+         *
+         * @param array $array Input array.
+         *
+         * @return bool
+         */
+        protected function is_associative_array( array $array ) {
+            if ( array() === $array ) {
+                return false;
+            }
+
+            return array_keys( $array ) !== range( 0, count( $array ) - 1 );
         }
 
         /**

@@ -129,6 +129,14 @@ class TCG_Kiosk_Filter_Plugin {
                     'cardsPerPage' => __( 'Cards per page', 'tcg-kiosk-filter' ),
                     'chooseGame' => __( 'Choose a game', 'tcg-kiosk-filter' ),
                     'chooseGameSubtitle' => __( 'Select a game to start browsing cards.', 'tcg-kiosk-filter' ),
+                    'cardDetailsTitle' => __( 'Card Details', 'tcg-kiosk-filter' ),
+                    'noDetails' => __( 'No additional details available for this card.', 'tcg-kiosk-filter' ),
+                    'viewDetails' => __( 'View details for %s', 'tcg-kiosk-filter' ),
+                    'viewDetailsFallback' => __( 'View card details', 'tcg-kiosk-filter' ),
+                    'gameLabel' => __( 'Game', 'tcg-kiosk-filter' ),
+                    'setLabel' => __( 'Set', 'tcg-kiosk-filter' ),
+                    'idLabel' => __( 'Card ID', 'tcg-kiosk-filter' ),
+                    'typeLabel' => __( 'Type', 'tcg-kiosk-filter' ),
                 ),
             )
         );
@@ -199,8 +207,119 @@ class TCG_Kiosk_Filter_Plugin {
     z-index: 9999;
 }
 
+.tcg-kiosk__card-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 10000;
+}
+
+.tcg-kiosk__card-overlay[hidden] {
+    display: none;
+}
+
 .tcg-kiosk__overlay[hidden] {
     display: none;
+}
+
+.tcg-kiosk__card-overlay-panel {
+    position: relative;
+    display: flex;
+    gap: 2rem;
+    width: 100%;
+    max-width: min(1040px, 90vw);
+    max-height: min(90vh, 90dvh);
+    background-color: #fff;
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+
+.tcg-kiosk__card-overlay-image {
+    flex: 1 1 48%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f6f7f7;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+}
+
+.tcg-kiosk__card-overlay-image img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    width: auto;
+    height: auto;
+}
+
+.tcg-kiosk__card-overlay-meta {
+    flex: 1 1 52%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    overflow-y: auto;
+}
+
+.tcg-kiosk__card-overlay-title {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1d2327;
+}
+
+.tcg-kiosk__card-overlay-details {
+    margin: 0;
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.5rem 1.5rem;
+    font-size: 0.95rem;
+}
+
+.tcg-kiosk__card-overlay-term {
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.tcg-kiosk__card-overlay-definition {
+    margin: 0;
+    color: #1d2327;
+    white-space: pre-line;
+}
+
+.tcg-kiosk__card-overlay-empty {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-style: italic;
+    color: #50575e;
+}
+
+.tcg-kiosk__card-overlay-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: #1d2327;
+    font-size: 2rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 999px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.tcg-kiosk__card-overlay-close:hover,
+.tcg-kiosk__card-overlay-close:focus-visible {
+    background-color: rgba(34, 113, 177, 0.1);
+    color: #135e96;
+    outline: none;
 }
 
 .tcg-kiosk__overlay-panel {
@@ -388,6 +507,7 @@ class TCG_Kiosk_Filter_Plugin {
     align-items: stretch;
     height: 100%;
     min-height: 0;
+    cursor: pointer;
 }
 
 .tcg-kiosk__card img {
@@ -398,6 +518,11 @@ class TCG_Kiosk_Filter_Plugin {
     border-radius: 0;
     background: #f6f7f7;
     object-fit: contain;
+}
+
+.tcg-kiosk__card:focus-visible {
+    outline: 3px solid #2271b1;
+    outline-offset: 4px;
 }
 
 .tcg-kiosk__empty {
@@ -457,6 +582,18 @@ class TCG_Kiosk_Filter_Plugin {
     }
 }
 
+@media (max-width: 900px) {
+    .tcg-kiosk__card-overlay-panel {
+        flex-direction: column;
+        max-height: min(92vh, 92dvh);
+    }
+
+    .tcg-kiosk__card-overlay-image,
+    .tcg-kiosk__card-overlay-meta {
+        flex: 1 1 auto;
+    }
+}
+
 body.page-tcg-kiosk-browser .entry-title {
     display: none;
 }
@@ -490,6 +627,12 @@ CSS;
   const overlayOptions = document.getElementById( 'tcg-kiosk-overlay-options' );
   const overlayTitle = document.getElementById( 'tcg-kiosk-overlay-title' );
   const overlaySubtitle = document.getElementById( 'tcg-kiosk-overlay-subtitle' );
+  const cardOverlay = document.getElementById( 'tcg-kiosk-card-overlay' );
+  const cardOverlayPanel = cardOverlay ? cardOverlay.querySelector( '.tcg-kiosk__card-overlay-panel' ) : null;
+  const cardOverlayImage = document.getElementById( 'tcg-kiosk-detail-image' );
+  const cardOverlayTitle = document.getElementById( 'tcg-kiosk-detail-title' );
+  const cardOverlayDetails = document.getElementById( 'tcg-kiosk-detail-metadata' );
+  const cardOverlayClose = document.getElementById( 'tcg-kiosk-detail-close' );
 
   if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeFilterLabel || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
@@ -502,6 +645,7 @@ CSS;
   let hasInteracted = false;
   let currentPage = 1;
   let selectedTypeValue = '';
+  let lastFocusedCard = null;
 
   function applyPageSizeLayout() {
     const normalized = [ 10, 12, 16, 20 ].includes( cardsPerPage ) ? cardsPerPage : 10;
@@ -529,6 +673,250 @@ CSS;
     } );
   }
 
+  function closeCardOverlay( options ) {
+    if ( ! cardOverlay ) {
+      return;
+    }
+
+    const trigger = lastFocusedCard;
+    const shouldRestoreFocus = ! options || options.restoreFocus !== false;
+
+    if ( trigger && typeof trigger.setAttribute === 'function' ) {
+      trigger.setAttribute( 'aria-expanded', 'false' );
+    }
+
+    if ( cardOverlay.hidden ) {
+      if (
+        options && options.restoreFocus === false ||
+        ! trigger ||
+        ! ( 'isConnected' in trigger ? trigger.isConnected : document.contains( trigger ) ) ||
+        ! shouldRestoreFocus
+      ) {
+        lastFocusedCard = null;
+      }
+
+      return;
+    }
+
+    cardOverlay.hidden = true;
+    cardOverlay.setAttribute( 'aria-hidden', 'true' );
+
+    if ( cardOverlayImage ) {
+      cardOverlayImage.removeAttribute( 'src' );
+      cardOverlayImage.removeAttribute( 'srcset' );
+      cardOverlayImage.removeAttribute( 'sizes' );
+      cardOverlayImage.alt = '';
+    }
+
+    if ( cardOverlayDetails ) {
+      cardOverlayDetails.innerHTML = '';
+    }
+
+    if ( cardOverlayTitle ) {
+      cardOverlayTitle.textContent = '';
+    }
+
+    document.removeEventListener( 'keydown', handleCardOverlayKeydown, true );
+
+    const canRestoreFocus =
+      shouldRestoreFocus &&
+      trigger &&
+      typeof trigger.focus === 'function' &&
+      ( 'isConnected' in trigger ? trigger.isConnected : document.contains( trigger ) );
+
+    if ( canRestoreFocus ) {
+      trigger.focus();
+    }
+
+    lastFocusedCard = null;
+  }
+
+  function handleCardOverlayKeydown( event ) {
+    if ( 'Escape' === event.key || 'Esc' === event.key ) {
+      event.preventDefault();
+      closeCardOverlay();
+    }
+  }
+
+  function buildCardDetailEntries( card ) {
+    if ( card && Array.isArray( card.details ) ) {
+      return card.details
+        .map( ( entry ) => {
+          if ( ! entry || 'string' !== typeof entry.label || 'string' !== typeof entry.value ) {
+            return null;
+          }
+
+          const label = entry.label.trim();
+          const value = entry.value.trim();
+
+          if ( ! label || ! value ) {
+            return null;
+          }
+
+          return { label, value };
+        } )
+        .filter( Boolean );
+    }
+
+    if ( ! card ) {
+      return [];
+    }
+
+    const entries = [];
+
+    if ( card.game ) {
+      entries.push( { label: i18n.gameLabel || 'Game', value: card.game } );
+    }
+
+    if ( card.set ) {
+      entries.push( { label: i18n.setLabel || 'Set', value: card.set } );
+    }
+
+    if ( Array.isArray( card.typeValues ) && card.typeValues.length ) {
+      const typeLabel = typeFilterLabel && typeFilterLabel.textContent ? typeFilterLabel.textContent.trim() : '';
+      entries.push( {
+        label: typeLabel || i18n.typeLabel || 'Type',
+        value: card.typeValues.join( ', ' ),
+      } );
+    }
+
+    if ( card.id ) {
+      entries.push( { label: i18n.idLabel || 'Card ID', value: card.id } );
+    }
+
+    return entries;
+  }
+
+  function openCardOverlay( card, triggerElement ) {
+    if ( ! cardOverlay || ! card ) {
+      return;
+    }
+
+    lastFocusedCard = triggerElement || null;
+
+    if ( lastFocusedCard && typeof lastFocusedCard.setAttribute === 'function' ) {
+      lastFocusedCard.setAttribute( 'aria-expanded', 'true' );
+    }
+
+    const titleText = card.name || i18n.cardDetailsTitle || 'Card Details';
+    const entries = buildCardDetailEntries( card );
+
+    if ( cardOverlayTitle ) {
+      cardOverlayTitle.textContent = titleText;
+    }
+
+    if ( cardOverlayDetails ) {
+      cardOverlayDetails.innerHTML = '';
+
+      if ( entries.length ) {
+        entries.forEach( ( entry ) => {
+          const term = document.createElement( 'dt' );
+          term.className = 'tcg-kiosk__card-overlay-term';
+          term.textContent = entry.label;
+
+          const definition = document.createElement( 'dd' );
+          definition.className = 'tcg-kiosk__card-overlay-definition';
+          definition.textContent = entry.value;
+
+          cardOverlayDetails.appendChild( term );
+          cardOverlayDetails.appendChild( definition );
+        } );
+      } else {
+        const placeholderTerm = document.createElement( 'dt' );
+        placeholderTerm.className = 'tcg-kiosk__card-overlay-term';
+        placeholderTerm.textContent = i18n.cardDetailsTitle || 'Card Details';
+
+        const placeholderDefinition = document.createElement( 'dd' );
+        placeholderDefinition.className = 'tcg-kiosk__card-overlay-definition tcg-kiosk__card-overlay-empty';
+        placeholderDefinition.textContent = i18n.noDetails || 'No additional details available for this card.';
+
+        cardOverlayDetails.appendChild( placeholderTerm );
+        cardOverlayDetails.appendChild( placeholderDefinition );
+      }
+    }
+
+    if ( cardOverlayImage ) {
+      const preferredImage = card.imageFullUrl || card.imageUrl || '';
+      const proxied = getProxiedImageUrl( preferredImage );
+      const source = proxied || preferredImage;
+
+      if ( source ) {
+        cardOverlayImage.src = source;
+      } else {
+        cardOverlayImage.removeAttribute( 'src' );
+      }
+
+      if ( card.imageSrcset ) {
+        const proxiedSrcset = proxied ? buildProxiedSrcset( card.imageSrcset ) : '';
+
+        if ( proxiedSrcset ) {
+          cardOverlayImage.srcset = proxiedSrcset;
+        } else if ( ! proxied ) {
+          cardOverlayImage.srcset = card.imageSrcset;
+        } else {
+          cardOverlayImage.removeAttribute( 'srcset' );
+        }
+      } else {
+        cardOverlayImage.removeAttribute( 'srcset' );
+      }
+
+      if ( card.imageSizes ) {
+        cardOverlayImage.sizes = card.imageSizes;
+      } else {
+        cardOverlayImage.removeAttribute( 'sizes' );
+      }
+
+      cardOverlayImage.alt = titleText;
+      cardOverlayImage.loading = 'eager';
+      cardOverlayImage.decoding = 'async';
+      cardOverlayImage.referrerPolicy = 'no-referrer';
+    }
+
+    cardOverlay.hidden = false;
+    cardOverlay.removeAttribute( 'aria-hidden' );
+
+    document.addEventListener( 'keydown', handleCardOverlayKeydown, true );
+
+    if ( cardOverlayClose && typeof cardOverlayClose.focus === 'function' ) {
+      cardOverlayClose.focus();
+    } else if ( cardOverlay && typeof cardOverlay.focus === 'function' ) {
+      cardOverlay.focus();
+    }
+  }
+
+  function attachCardOverlayHandlers( element, card ) {
+    if ( ! element ) {
+      return;
+    }
+
+    element.tabIndex = 0;
+    element.setAttribute( 'role', 'button' );
+    element.setAttribute( 'aria-haspopup', 'dialog' );
+    element.setAttribute( 'aria-expanded', 'false' );
+
+    const template = i18n.viewDetails || '';
+    const fallbackLabel = i18n.viewDetailsFallback || 'View card details';
+    let ariaLabel = fallbackLabel;
+
+    if ( card && card.name ) {
+      if ( template && template.includes( '%s' ) ) {
+        ariaLabel = template.replace( '%s', card.name );
+      } else {
+        ariaLabel = card.name;
+      }
+    }
+
+    element.setAttribute( 'aria-label', ariaLabel );
+
+    element.addEventListener( 'click', () => openCardOverlay( card, element ) );
+    element.addEventListener( 'keydown', ( event ) => {
+      if ( 'Enter' === event.key || ' ' === event.key || 'Spacebar' === event.key ) {
+        event.preventDefault();
+        openCardOverlay( card, element );
+      }
+    } );
+  }
+
   function hideOverlay() {
     if ( ! overlay ) {
       return;
@@ -542,6 +930,8 @@ CSS;
     if ( ! overlay ) {
       return;
     }
+
+    closeCardOverlay( { restoreFocus: false } );
 
     overlay.hidden = false;
     overlay.removeAttribute( 'aria-hidden' );
@@ -878,6 +1268,8 @@ CSS;
   function renderCards() {
     applyPageSizeLayout();
 
+    closeCardOverlay( { restoreFocus: false } );
+
     if ( ! hasInteracted ) {
       resultsContainer.innerHTML = '';
       renderPagination( 0 );
@@ -913,6 +1305,8 @@ CSS;
     pageCards.forEach( ( card, index ) => {
       const item = document.createElement( 'article' );
       item.className = 'tcg-kiosk__card';
+
+      attachCardOverlayHandlers( item, card );
 
       const img = document.createElement( 'img' );
       const proxiedUrl = getProxiedImageUrl( card.imageUrl );
@@ -1062,6 +1456,24 @@ CSS;
     paginationContainer.appendChild( nextButton );
   }
 
+  if ( cardOverlay ) {
+    cardOverlay.addEventListener( 'click', ( event ) => {
+      if ( event.target === cardOverlay ) {
+        closeCardOverlay();
+      }
+    } );
+  }
+
+  if ( cardOverlayPanel ) {
+    cardOverlayPanel.addEventListener( 'click', ( event ) => {
+      event.stopPropagation();
+    } );
+  }
+
+  if ( cardOverlayClose ) {
+    cardOverlayClose.addEventListener( 'click', () => closeCardOverlay() );
+  }
+
   gameSelect.addEventListener( 'change', () => {
     hasInteracted = true;
     currentPage = 1;
@@ -1135,6 +1547,18 @@ JS;
                     <h2 id="tcg-kiosk-overlay-title" class="tcg-kiosk__overlay-title"><?php esc_html_e( 'Choose a game', 'tcg-kiosk-filter' ); ?></h2>
                     <p id="tcg-kiosk-overlay-subtitle" class="tcg-kiosk__overlay-subtitle"><?php esc_html_e( 'Select a game to start browsing cards.', 'tcg-kiosk-filter' ); ?></p>
                     <div id="tcg-kiosk-overlay-options" class="tcg-kiosk__overlay-options" role="group" aria-label="<?php esc_attr_e( 'Available games', 'tcg-kiosk-filter' ); ?>"></div>
+                </div>
+            </div>
+            <div id="tcg-kiosk-card-overlay" class="tcg-kiosk__card-overlay" role="dialog" aria-modal="true" aria-labelledby="tcg-kiosk-detail-title" aria-hidden="true" hidden tabindex="-1">
+                <div class="tcg-kiosk__card-overlay-panel">
+                    <button type="button" id="tcg-kiosk-detail-close" class="tcg-kiosk__card-overlay-close" aria-label="<?php esc_attr_e( 'Close card details', 'tcg-kiosk-filter' ); ?>">&times;</button>
+                    <div class="tcg-kiosk__card-overlay-image">
+                        <img id="tcg-kiosk-detail-image" alt="" />
+                    </div>
+                    <div class="tcg-kiosk__card-overlay-meta">
+                        <h2 id="tcg-kiosk-detail-title" class="tcg-kiosk__card-overlay-title"></h2>
+                        <dl id="tcg-kiosk-detail-metadata" class="tcg-kiosk__card-overlay-details"></dl>
+                    </div>
                 </div>
             </div>
             <header class="tcg-kiosk__header">
