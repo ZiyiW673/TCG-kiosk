@@ -516,7 +516,6 @@ class TCG_Kiosk_Filter_Plugin {
     min-height: 0;
     flex: 1 1 auto;
     border-radius: 0;
-    background: #f6f7f7;
     object-fit: contain;
 }
 
