@@ -375,32 +375,19 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 
+
 .tcg-kiosk__card {
-    background: #fff;
-    border: 1px solid #dcdcde;
-    border-radius: 6px;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
     overflow: hidden;
-    padding: 1rem;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    align-items: stretch;
     height: 100%;
     min-height: 0;
-}
-
-.tcg-kiosk[data-page-size="16"] .tcg-kiosk__card,
-.tcg-kiosk[data-page-size="20"] .tcg-kiosk__card {
-    padding: 0.75rem;
-    gap: 0.5rem;
-}
-
-.tcg-kiosk[data-page-size="20"] .tcg-kiosk__card h3 {
-    font-size: 0.95rem;
-}
-
-.tcg-kiosk[data-page-size="16"] .tcg-kiosk__card h3 {
-    font-size: 0.98rem;
 }
 
 .tcg-kiosk__card img {
@@ -408,30 +395,9 @@ class TCG_Kiosk_Filter_Plugin {
     height: 100%;
     min-height: 0;
     flex: 1 1 auto;
-    border-radius: 4px;
+    border-radius: 0;
     background: #f6f7f7;
     object-fit: contain;
-}
-
-.tcg-kiosk__card h3 {
-    margin: 0;
-    font-size: 1rem;
-    flex: 0 0 auto;
-}
-
-.tcg-kiosk__meta {
-    margin: 0;
-    font-size: 0.875rem;
-    color: #50575e;
-    margin-top: auto;
-}
-
-.tcg-kiosk[data-page-size="16"] .tcg-kiosk__meta {
-    font-size: 0.84rem;
-}
-
-.tcg-kiosk[data-page-size="20"] .tcg-kiosk__meta {
-    font-size: 0.8rem;
 }
 
 .tcg-kiosk__empty {
@@ -981,19 +947,7 @@ CSS;
         img.fetchPriority = 'high';
       }
       img.addEventListener( 'error', () => handleImageError( img, card ) );
-
-      const name = document.createElement( 'h3' );
-      name.textContent = card.name || 'Untitled Card';
-
-      const meta = document.createElement( 'p' );
-      meta.className = 'tcg-kiosk__meta';
-      meta.textContent = card.set || '';
-
       item.appendChild( img );
-      item.appendChild( name );
-      if ( card.set ) {
-        item.appendChild( meta );
-      }
 
       fragment.appendChild( item );
     } );
