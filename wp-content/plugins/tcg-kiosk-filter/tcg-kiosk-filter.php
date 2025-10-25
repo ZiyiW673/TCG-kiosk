@@ -906,29 +906,7 @@ CSS;
   }
 
   function getProxiedImageUrl( url ) {
-    if ( ! url ) {
-      return '';
-    }
-
-    let parsed;
-
-    try {
-      parsed = new URL( url );
-    } catch ( error ) {
-      return '';
-    }
-
-    const host = parsed.hostname.toLowerCase();
-
-    if ( 'images.weserv.nl' === host ) {
-      return '';
-    }
-
-    if ( ! host.endsWith( 'gundam-gcg.com' ) ) {
-      return '';
-    }
-
-    return 'https://images.weserv.nl/?url=' + encodeURIComponent( url );
+    return '';
   }
 
   function renderCards() {

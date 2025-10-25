@@ -198,33 +198,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 );
             }
 
-            if ( false !== strpos( $slug, 'gundam' ) ) {
-                return array(
-                    'label'            => __( 'Color', 'tcg-kiosk-filter' ),
-                    'field'            => 'color',
-                    'options'          => array(
-                        array(
-                            'value' => 'blue',
-                            'label' => __( 'Blue', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'green',
-                            'label' => __( 'Green', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'red',
-                            'label' => __( 'Red', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'white',
-                            'label' => __( 'White', 'tcg-kiosk-filter' ),
-                        ),
-                    ),
-                    'match_mode'       => 'contains',
-                    'case_insensitive' => true,
-                );
-            }
-
             if ( false !== strpos( $slug, 'riftbound' ) ) {
                 return array(
                     'label'            => __( 'Domain', 'tcg-kiosk-filter' ),
