@@ -238,24 +238,24 @@ class TCG_Kiosk_Filter_Plugin {
     padding: 2rem;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
     overflow: hidden;
+    align-items: stretch;
 }
 
 .tcg-kiosk__card-overlay-image {
-    flex: 1 1 48%;
+    flex: 1 1 56%;
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: center;
-    background: #f6f7f7;
-    border-radius: 0.75rem;
-    padding: 1.5rem;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    min-height: 0;
 }
 
 .tcg-kiosk__card-overlay-image img {
-    max-width: 100%;
-    max-height: 100%;
+    width: 100%;
+    height: 100%;
     object-fit: contain;
-    width: auto;
-    height: auto;
 }
 
 .tcg-kiosk__card-overlay-meta {
@@ -585,11 +585,20 @@ class TCG_Kiosk_Filter_Plugin {
     .tcg-kiosk__card-overlay-panel {
         flex-direction: column;
         max-height: min(92vh, 92dvh);
+        align-items: stretch;
     }
 
     .tcg-kiosk__card-overlay-image,
     .tcg-kiosk__card-overlay-meta {
         flex: 1 1 auto;
+    }
+
+    .tcg-kiosk__card-overlay-image {
+        width: 100%;
+    }
+
+    .tcg-kiosk__card-overlay-image img {
+        height: auto;
     }
 }
 
