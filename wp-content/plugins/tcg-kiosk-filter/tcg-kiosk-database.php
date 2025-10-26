@@ -140,7 +140,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         'imageSrcset'  => $image_sources['srcset'],
                         'imageSizes'   => $image_sources['sizes'],
                         'typeValues'   => $this->extract_type_values( $card, $config ),
-                        'details'      => $this->prepare_card_details( $card, $set_name, $game ),
+                        'details'      => $this->prepare_card_details( $card, $set_name, $game, $type_slug ),
                     );
                 }
             }
@@ -332,31 +332,244 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          * @param array  $card     Raw card payload.
          * @param string $set_name Derived set name from the file path.
          * @param string $game     Human readable game name.
+         * @param string $type_slug Game directory slug.
          *
          * @return array
          */
-        protected function prepare_card_details( array $card, $set_name, $game ) {
+        protected function prepare_card_details( array $card, $set_name, $game, $type_slug ) {
             $details = array();
+            $fields  = $this->get_detail_field_definitions( $type_slug );
 
-            $this->append_detail( $details, __( 'Game', 'tcg-kiosk-filter' ), $game );
-            $this->append_detail( $details, __( 'Source Set', 'tcg-kiosk-filter' ), $set_name );
-
-            foreach ( $card as $key => $value ) {
-                if ( in_array( $key, array( 'images' ), true ) ) {
+            foreach ( $fields as $definition ) {
+                if ( empty( $definition['label'] ) ) {
                     continue;
                 }
 
-                $label = $this->humanize_label( $key );
-                $text  = $this->normalize_detail_value( $value );
+                $value = $this->resolve_detail_value( $card, $set_name, $game, $definition );
 
-                if ( '' === $label || '' === $text ) {
-                    continue;
-                }
-
-                $this->append_detail( $details, $label, $text );
+                $this->append_detail( $details, $definition['label'], $value );
             }
 
             return $details;
+        }
+
+        /**
+         * Determine the detail field definitions for a given game directory.
+         *
+         * @param string $type_slug Game directory slug.
+         *
+         * @return array
+         */
+        protected function get_detail_field_definitions( $type_slug ) {
+            $slug = strtolower( (string) $type_slug );
+
+            if ( false !== strpos( $slug, 'pokemon' ) ) {
+                return array(
+                    array(
+                        'source' => 'card',
+                        'key'    => 'name',
+                        'label'  => __( 'Name', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'set_name',
+                        'label'  => __( 'Source Set', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'id',
+                        'label'  => __( 'ID', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'supertype',
+                        'label'  => __( 'Supertype', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'types',
+                        'label'  => __( 'Types', 'tcg-kiosk-filter' ),
+                        'format' => 'list',
+                    ),
+                );
+            }
+
+            if ( false !== strpos( $slug, 'one-piece' ) ) {
+                return array(
+                    array(
+                        'source' => 'card',
+                        'key'    => 'name',
+                        'label'  => __( 'Name', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card_set_name',
+                        'label'  => __( 'Source Set', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'set_name',
+                        'label'  => __( 'Source Set', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'code',
+                        'label'  => __( 'Code', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'rarity',
+                        'label'  => __( 'Rarity', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'type',
+                        'label'  => __( 'Type', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'color',
+                        'label'  => __( 'Color', 'tcg-kiosk-filter' ),
+                    ),
+                );
+            }
+
+            if ( false !== strpos( $slug, 'riftbound' ) ) {
+                return array(
+                    array(
+                        'source' => 'card',
+                        'key'    => 'name',
+                        'label'  => __( 'Name', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card_set_name',
+                        'label'  => __( 'Source Set', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'number',
+                        'label'  => __( 'Number', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'rarity',
+                        'label'  => __( 'Rarity', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'cardType',
+                        'label'  => __( 'Card Type', 'tcg-kiosk-filter' ),
+                    ),
+                    array(
+                        'source' => 'card',
+                        'key'    => 'domain',
+                        'label'  => __( 'Domain', 'tcg-kiosk-filter' ),
+                    ),
+                );
+            }
+
+            return array(
+                array(
+                    'source' => 'card',
+                    'key'    => 'name',
+                    'label'  => __( 'Name', 'tcg-kiosk-filter' ),
+                ),
+                array(
+                    'source' => 'set_name',
+                    'label'  => __( 'Source Set', 'tcg-kiosk-filter' ),
+                ),
+                array(
+                    'source' => 'card',
+                    'key'    => 'id',
+                    'label'  => __( 'ID', 'tcg-kiosk-filter' ),
+                ),
+            );
+        }
+
+        /**
+         * Resolve a field definition to a displayable value.
+         *
+         * @param array  $card       Raw card payload.
+         * @param string $set_name   Derived set name.
+         * @param string $game       Human readable game name.
+         * @param array  $definition Field definition array.
+         *
+         * @return string
+         */
+        protected function resolve_detail_value( array $card, $set_name, $game, array $definition ) {
+            $source = isset( $definition['source'] ) ? $definition['source'] : 'card';
+
+            if ( 'game' === $source ) {
+                return is_string( $game ) ? trim( $game ) : '';
+            }
+
+            if ( 'set_name' === $source ) {
+                return is_string( $set_name ) ? trim( $set_name ) : '';
+            }
+
+            if ( 'card_set_name' === $source ) {
+                if ( isset( $card['set'] ) && is_array( $card['set'] ) ) {
+                    if ( isset( $card['set']['name'] ) ) {
+                        return $this->normalize_detail_value( $card['set']['name'] );
+                    }
+
+                    if ( isset( $card['set']['id'] ) ) {
+                        return $this->normalize_detail_value( $card['set']['id'] );
+                    }
+                }
+
+                return '';
+            }
+
+            if ( 'card' !== $source ) {
+                return '';
+            }
+
+            $key = isset( $definition['key'] ) ? (string) $definition['key'] : '';
+
+            if ( '' === $key ) {
+                return '';
+            }
+
+            $value = null;
+
+            if ( array_key_exists( $key, $card ) ) {
+                $value = $card[ $key ];
+            } else {
+                $target = strtolower( $key );
+
+                foreach ( $card as $card_key => $card_value ) {
+                    if ( strtolower( (string) $card_key ) === $target ) {
+                        $value = $card_value;
+                        break;
+                    }
+                }
+            }
+
+            if ( null === $value ) {
+                return '';
+            }
+
+            if ( isset( $definition['format'] ) && 'list' === $definition['format'] ) {
+                if ( is_array( $value ) ) {
+                    $parts = array();
+
+                    foreach ( $value as $item ) {
+                        $normalized = $this->normalize_detail_value( $item );
+
+                        if ( '' === $normalized ) {
+                            continue;
+                        }
+
+                        $parts[] = $normalized;
+                    }
+
+                    return empty( $parts ) ? '' : implode( ', ', $parts );
+                }
+
+                $normalized = $this->normalize_detail_value( $value );
+
+                return '' === $normalized ? '' : $normalized;
+            }
+
+            return $this->normalize_detail_value( $value );
         }
 
         /**
