@@ -1069,11 +1069,33 @@ CSS;
       }
     } );
 
-    Array.from( sets )
-      .sort()
-      .forEach( ( setName ) => {
-        setSelect.appendChild( createOption( setName, setName ) );
+    const availableSets = Array.from( sets );
+    const configuredOrder = Array.isArray( selected.setOrder ) ? selected.setOrder : [];
+    const orderedSets = [];
+
+    if ( configuredOrder.length ) {
+      const seen = new Set();
+
+      configuredOrder.forEach( ( setName ) => {
+        if ( sets.has( setName ) && ! seen.has( setName ) ) {
+          orderedSets.push( setName );
+          seen.add( setName );
+        }
       } );
+
+      availableSets.forEach( ( setName ) => {
+        if ( ! seen.has( setName ) ) {
+          orderedSets.push( setName );
+        }
+      } );
+    } else {
+      availableSets.sort( ( a, b ) => a.localeCompare( b ) );
+      orderedSets.push( ...availableSets );
+    }
+
+    orderedSets.forEach( ( setName ) => {
+      setSelect.appendChild( createOption( setName, setName ) );
+    } );
 
     setSelect.disabled = sets.size === 0;
   }

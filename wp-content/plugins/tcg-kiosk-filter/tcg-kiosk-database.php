@@ -67,6 +67,8 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     continue;
                 }
 
+                $context = $this->get_set_context( $type_slug, $directory );
+
                 $data['cards'][] = array(
                     'slug'                => $type_slug,
                     'label'               => $this->humanize_label( $type_slug ),
@@ -74,6 +76,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     'typeOptions'         => $config['options'],
                     'typeMatchMode'       => $config['match_mode'],
                     'typeCaseInsensitive' => $config['case_insensitive'],
+                    'setOrder'            => isset( $context['order'] ) && is_array( $context['order'] ) ? array_values( $context['order'] ) : array(),
                     'cards'               => $cards,
                 );
             }
@@ -864,6 +867,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             $context = array(
                 'names'   => array(),
                 'allowed' => null,
+                'order'   => array(),
             );
 
             if ( false === strpos( $slug, 'pokemon' ) ) {
@@ -954,6 +958,17 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 }
 
                 $context['allowed'] = $allowed;
+
+                if ( ! empty( $allowed ) ) {
+                    foreach ( $allowed as $allowed_id ) {
+                        if ( isset( $context['names'][ $allowed_id ] ) ) {
+                            $context['order'][] = $context['names'][ $allowed_id ];
+                            continue;
+                        }
+
+                        $context['order'][] = $this->derive_set_name( $allowed_id );
+                    }
+                }
             }
 
             $this->set_cache[ $slug ] = $context;
