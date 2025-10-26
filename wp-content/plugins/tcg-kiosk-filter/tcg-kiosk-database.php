@@ -284,15 +284,15 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             $slug = strtolower( (string) $type_slug );
 
             if ( false !== strpos( $slug, 'pokemon' ) ) {
-                return plugins_url( 'assets/overlay/pokemon-card-back.svg', __FILE__ );
+                return plugins_url( 'assets/overlay/pokemon-card-back.png', __FILE__ );
             }
 
             if ( false !== strpos( $slug, 'one-piece' ) ) {
-                return plugins_url( 'assets/overlay/one-piece-card-back.svg', __FILE__ );
+                return plugins_url( 'assets/overlay/one-piece-card-back.png', __FILE__ );
             }
 
             if ( false !== strpos( $slug, 'riftbound' ) || false !== strpos( $slug, 'league-of-legends' ) ) {
-                return plugins_url( 'assets/overlay/riftbound-card-back.svg', __FILE__ );
+                return plugins_url( 'assets/overlay/riftbound-card-back.png', __FILE__ );
             }
 
             return '';
