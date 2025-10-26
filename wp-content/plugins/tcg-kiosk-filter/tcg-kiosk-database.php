@@ -578,6 +578,16 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 return '';
             }
 
+            $is_pokemon = false !== strpos( $this->to_lower( (string) $type_slug ), 'pokemon' );
+
+            if ( $is_pokemon && 'id' === $key ) {
+                $formatted_id = $this->format_pokemon_card_identifier( $value, $card, $type_slug );
+
+                if ( '' !== $formatted_id ) {
+                    return $formatted_id;
+                }
+            }
+
             if ( isset( $definition['format'] ) && 'list' === $definition['format'] ) {
                 if ( is_array( $value ) ) {
                     $parts = array();
@@ -601,6 +611,70 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             }
 
             return $this->normalize_detail_value( $value );
+        }
+
+        /**
+         * Format a Pokémon card identifier using the set's PTCGO code and card number.
+         *
+         * @param mixed  $value     Raw identifier value.
+         * @param array  $card      Original card payload.
+         * @param string $type_slug Game directory slug.
+         *
+         * @return string
+         */
+        protected function format_pokemon_card_identifier( $value, array $card, $type_slug ) {
+            if ( is_array( $value ) || is_object( $value ) ) {
+                return '';
+            }
+
+            $raw = trim( (string) $value );
+
+            if ( '' === $raw ) {
+                return '';
+            }
+
+            $set_identifier = '';
+            $number         = '';
+
+            if ( false !== strpos( $raw, '-' ) ) {
+                $parts = explode( '-', $raw, 2 );
+
+                if ( ! empty( $parts ) ) {
+                    $set_identifier = (string) $parts[0];
+
+                    if ( isset( $parts[1] ) && '' === $number ) {
+                        $number = trim( (string) $parts[1] );
+                    }
+                }
+            }
+
+            if ( isset( $card['number'] ) ) {
+                $card_number = trim( (string) $card['number'] );
+
+                if ( '' !== $card_number ) {
+                    $number = $card_number;
+                }
+            }
+
+            if ( '' === $set_identifier && isset( $card['set'] ) && is_array( $card['set'] ) && isset( $card['set']['id'] ) ) {
+                $set_identifier = (string) $card['set']['id'];
+            }
+
+            if ( '' === $set_identifier ) {
+                return '' === $number ? $raw : $number;
+            }
+
+            $code = $this->resolve_set_code( $type_slug, $set_identifier );
+
+            if ( '' === $code ) {
+                return '' === $number ? strtoupper( $set_identifier ) : strtoupper( $set_identifier ) . '-' . $number;
+            }
+
+            if ( '' === $number ) {
+                return $code;
+            }
+
+            return $code . '-' . $number;
         }
 
         /**
@@ -866,6 +940,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
 
             $context = array(
                 'names'   => array(),
+                'codes'   => array(),
                 'allowed' => null,
                 'order'   => array(),
             );
@@ -928,6 +1003,14 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 }
 
                 $context['names'][ $id ] = $name;
+
+                if ( isset( $set['ptcgoCode'] ) ) {
+                    $code = $this->normalize_detail_value( $set['ptcgoCode'] );
+
+                    if ( '' !== $code ) {
+                        $context['codes'][ $id ] = strtoupper( $code );
+                    }
+                }
 
                 if ( 'swshp' === $id ) {
                     $threshold_index = $index;
@@ -1034,6 +1117,25 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             $label = preg_replace( '/\s+/', ' ', $label );
 
             return ucwords( trim( $label ) );
+        }
+
+        /**
+         * Resolve a set identifier to its configured PTCGO code.
+         *
+         * @param string $type_slug Game directory slug.
+         * @param string $set_id    Raw set identifier.
+         *
+         * @return string
+         */
+        protected function resolve_set_code( $type_slug, $set_id ) {
+            $slug = $this->to_lower( (string) $type_slug );
+            $id   = $this->to_lower( (string) $set_id );
+
+            if ( isset( $this->set_cache[ $slug ] ) && isset( $this->set_cache[ $slug ]['codes'][ $id ] ) ) {
+                return $this->set_cache[ $slug ]['codes'][ $id ];
+            }
+
+            return '';
         }
 
         /**
