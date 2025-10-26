@@ -76,6 +76,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     'typeOptions'         => $config['options'],
                     'typeMatchMode'       => $config['match_mode'],
                     'typeCaseInsensitive' => $config['case_insensitive'],
+                    'overlayImage'        => $this->get_overlay_image_url( $type_slug ),
                     'setOrder'            => isset( $context['order'] ) && is_array( $context['order'] ) ? array_values( $context['order'] ) : array(),
                     'cards'               => $cards,
                 );
@@ -270,6 +271,31 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'match_mode'       => 'exact',
                 'case_insensitive' => false,
             );
+        }
+
+        /**
+         * Retrieve the overlay image URL for the given game slug.
+         *
+         * @param string $type_slug Game directory slug.
+         *
+         * @return string
+         */
+        protected function get_overlay_image_url( $type_slug ) {
+            $slug = strtolower( (string) $type_slug );
+
+            if ( false !== strpos( $slug, 'pokemon' ) ) {
+                return plugins_url( 'assets/overlay/pokemon-card-back.svg', __FILE__ );
+            }
+
+            if ( false !== strpos( $slug, 'one-piece' ) ) {
+                return plugins_url( 'assets/overlay/one-piece-card-back.svg', __FILE__ );
+            }
+
+            if ( false !== strpos( $slug, 'riftbound' ) || false !== strpos( $slug, 'league-of-legends' ) ) {
+                return plugins_url( 'assets/overlay/riftbound-card-back.svg', __FILE__ );
+            }
+
+            return '';
         }
 
         /**

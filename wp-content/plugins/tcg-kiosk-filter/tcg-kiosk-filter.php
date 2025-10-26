@@ -348,34 +348,76 @@ class TCG_Kiosk_Filter_Plugin {
 
 .tcg-kiosk__overlay-options {
     display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .tcg-kiosk__overlay-button {
     appearance: none;
     border: none;
-    background: #2271b1;
-    color: #fff;
-    border-radius: 999px;
-    padding: 0.85rem 1rem;
-    font-size: 1rem;
-    font-weight: 600;
+    background: transparent;
+    color: inherit;
+    border-radius: 1.25rem;
+    padding: 0;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 18px 35px -18px rgba(0, 0, 0, 0.45);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .tcg-kiosk__overlay-button:hover,
 .tcg-kiosk__overlay-button:focus {
-    background-color: #135e96;
-    transform: translateY(-1px);
-    box-shadow: 0 10px 25px -10px rgba(19, 94, 150, 0.6);
+    transform: translateY(-4px);
+    box-shadow: 0 25px 45px -18px rgba(0, 0, 0, 0.55);
     outline: none;
 }
 
 .tcg-kiosk__overlay-button:focus-visible {
-    outline: 2px solid #f0b849;
-    outline-offset: 2px;
+    outline: 3px solid #f0b849;
+    outline-offset: 4px;
+}
+
+.tcg-kiosk__overlay-button img {
+    display: block;
+    width: 100%;
+    height: auto;
+    pointer-events: none;
+}
+
+.tcg-kiosk__overlay-button-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.tcg-kiosk__overlay-button--fallback {
+    background: #2271b1;
+    color: #fff;
+    padding: 0.85rem 1rem;
+    box-shadow: none;
+}
+
+.tcg-kiosk__overlay-button--fallback:hover,
+.tcg-kiosk__overlay-button--fallback:focus {
+    background-color: #135e96;
+    box-shadow: 0 10px 25px -10px rgba(19, 94, 150, 0.6);
+    transform: translateY(-1px);
+}
+
+.tcg-kiosk__overlay-button--fallback .tcg-kiosk__overlay-button-text {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip: auto;
+    white-space: normal;
 }
 
 .tcg-kiosk__type-button {
@@ -997,10 +1039,28 @@ CSS;
         return;
       }
 
+      const label = type.label || type.slug;
       const button = document.createElement( 'button' );
       button.type = 'button';
       button.className = 'tcg-kiosk__overlay-button';
-      button.textContent = type.label || type.slug;
+      button.setAttribute( 'aria-label', label );
+
+      if ( type.overlayImage ) {
+        const img = document.createElement( 'img' );
+        img.src = type.overlayImage;
+        img.alt = '';
+        img.decoding = 'async';
+        img.loading = 'lazy';
+        button.appendChild( img );
+      } else {
+        button.classList.add( 'tcg-kiosk__overlay-button--fallback' );
+      }
+
+      const text = document.createElement( 'span' );
+      text.className = 'tcg-kiosk__overlay-button-text';
+      text.textContent = label;
+      button.appendChild( text );
+
       button.addEventListener( 'click', () => handleOverlaySelection( type.slug ) );
       overlayOptions.appendChild( button );
     } );
