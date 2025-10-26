@@ -244,7 +244,7 @@ class TCG_Kiosk_Filter_Plugin {
 .tcg-kiosk__card-overlay-image {
     flex: 1 1 56%;
     display: flex;
-    align-items: stretch;
+    align-items: center;
     justify-content: center;
     padding: 0;
     background: transparent;
@@ -253,8 +253,9 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk__card-overlay-image img {
-    width: 100%;
-    height: 100%;
+    width: 70%;
+    height: auto;
+    max-height: 70%;
     object-fit: contain;
 }
 
@@ -598,7 +599,9 @@ class TCG_Kiosk_Filter_Plugin {
     }
 
     .tcg-kiosk__card-overlay-image img {
+        width: 70%;
         height: auto;
+        max-height: 70%;
     }
 }
 
