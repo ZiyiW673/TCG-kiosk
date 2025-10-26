@@ -20,6 +20,13 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
         protected $cache = null;
 
         /**
+         * Cache of set metadata grouped by game slug.
+         *
+         * @var array
+         */
+        protected $set_cache = array();
+
+        /**
          * TCG_Kiosk_Database constructor.
          *
          * @param string $database_path Absolute path to the database directory.
@@ -90,8 +97,10 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 return array();
             }
 
-            $cards = array();
-            $game  = $this->humanize_label( $type_slug );
+            $cards       = array();
+            $game        = $this->humanize_label( $type_slug );
+            $set_context = $this->get_set_context( $type_slug, $directory );
+            $allowed_sets = isset( $set_context['allowed'] ) ? $set_context['allowed'] : null;
 
             $iterator = new RecursiveIteratorIterator(
                 new RecursiveDirectoryIterator(
@@ -103,6 +112,15 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             foreach ( $iterator as $file ) {
                 if ( 'json' !== strtolower( $file->getExtension() ) ) {
                     continue;
+                }
+
+                $set_basename = $file->getBasename( '.json' );
+                $set_id       = $this->to_lower( $set_basename );
+
+                if ( is_array( $allowed_sets ) ) {
+                    if ( empty( $allowed_sets ) || ! in_array( $set_id, $allowed_sets, true ) ) {
+                        continue;
+                    }
                 }
 
                 $json = file_get_contents( $file->getPathname() );
@@ -117,6 +135,8 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     continue;
                 }
 
+                $set_name = $this->resolve_set_label( $type_slug, $set_id, $set_basename );
+
                 foreach ( $decoded as $card ) {
                     if ( empty( $card['images'] ) || ! is_array( $card['images'] ) ) {
                         continue;
@@ -127,8 +147,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     if ( empty( $image_sources['primary'] ) ) {
                         continue;
                     }
-
-                    $set_name = $this->derive_set_name( $file->getBasename( '.json' ) );
 
                     $cards[] = array(
                         'id'           => isset( $card['id'] ) ? (string) $card['id'] : '',
@@ -345,7 +363,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     continue;
                 }
 
-                $value = $this->resolve_detail_value( $card, $set_name, $game, $definition );
+                $value = $this->resolve_detail_value( $card, $set_name, $game, $definition, $type_slug );
 
                 $this->append_detail( $details, $definition['label'], $value );
             }
@@ -490,10 +508,11 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          * @param string $set_name   Derived set name.
          * @param string $game       Human readable game name.
          * @param array  $definition Field definition array.
+         * @param string $type_slug  Game directory slug.
          *
          * @return string
          */
-        protected function resolve_detail_value( array $card, $set_name, $game, array $definition ) {
+        protected function resolve_detail_value( array $card, $set_name, $game, array $definition, $type_slug ) {
             $source = isset( $definition['source'] ) ? $definition['source'] : 'card';
 
             if ( 'game' === $source ) {
@@ -507,11 +526,20 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             if ( 'card_set_name' === $source ) {
                 if ( isset( $card['set'] ) && is_array( $card['set'] ) ) {
                     if ( isset( $card['set']['name'] ) ) {
-                        return $this->normalize_detail_value( $card['set']['name'] );
+                        $name = $this->normalize_detail_value( $card['set']['name'] );
+
+                        if ( '' !== $name ) {
+                            return $name;
+                        }
                     }
 
                     if ( isset( $card['set']['id'] ) ) {
-                        return $this->normalize_detail_value( $card['set']['id'] );
+                        $label = $this->resolve_set_label( $type_slug, $card['set']['id'], $card['set']['id'] );
+                        $name  = $this->normalize_detail_value( $label );
+
+                        if ( '' !== $name ) {
+                            return $name;
+                        }
                     }
                 }
 
@@ -816,6 +844,145 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             }
 
             return $sources;
+        }
+
+        /**
+         * Retrieve cached set metadata for the provided game directory.
+         *
+         * @param string $type_slug Game directory slug.
+         * @param string $directory Absolute path to the game directory.
+         *
+         * @return array
+         */
+        protected function get_set_context( $type_slug, $directory ) {
+            $slug = $this->to_lower( (string) $type_slug );
+
+            if ( isset( $this->set_cache[ $slug ] ) ) {
+                return $this->set_cache[ $slug ];
+            }
+
+            $context = array(
+                'names'   => array(),
+                'allowed' => null,
+            );
+
+            if ( false === strpos( $slug, 'pokemon' ) ) {
+                $this->set_cache[ $slug ] = $context;
+
+                return $context;
+            }
+
+            $sets_file = trailingslashit( $directory ) . 'sets/en.json';
+
+            if ( ! is_readable( $sets_file ) ) {
+                $this->set_cache[ $slug ] = $context;
+
+                return $context;
+            }
+
+            $json = file_get_contents( $sets_file );
+
+            if ( false === $json ) {
+                $this->set_cache[ $slug ] = $context;
+
+                return $context;
+            }
+
+            $decoded = json_decode( $json, true );
+
+            if ( empty( $decoded ) || ! is_array( $decoded ) ) {
+                $this->set_cache[ $slug ] = $context;
+
+                return $context;
+            }
+
+            $threshold_index = null;
+
+            foreach ( $decoded as $index => $set ) {
+                if ( ! is_array( $set ) ) {
+                    continue;
+                }
+
+                if ( ! isset( $set['id'] ) ) {
+                    continue;
+                }
+
+                $id = $this->to_lower( (string) $set['id'] );
+
+                if ( '' === $id ) {
+                    continue;
+                }
+
+                $name = '';
+
+                if ( isset( $set['name'] ) ) {
+                    $name = $this->normalize_detail_value( $set['name'] );
+                }
+
+                if ( '' === $name ) {
+                    $name = $this->derive_set_name( $id );
+                }
+
+                $context['names'][ $id ] = $name;
+
+                if ( 'swshp' === $id ) {
+                    $threshold_index = $index;
+                }
+            }
+
+            if ( null !== $threshold_index ) {
+                $allowed = array();
+
+                foreach ( $decoded as $index => $set ) {
+                    if ( ! is_array( $set ) ) {
+                        continue;
+                    }
+
+                    if ( ! isset( $set['id'] ) ) {
+                        continue;
+                    }
+
+                    $id = $this->to_lower( (string) $set['id'] );
+
+                    if ( '' === $id ) {
+                        continue;
+                    }
+
+                    if ( $index > $threshold_index ) {
+                        $allowed[] = $id;
+                    }
+                }
+
+                $context['allowed'] = $allowed;
+            }
+
+            $this->set_cache[ $slug ] = $context;
+
+            return $context;
+        }
+
+        /**
+         * Resolve a set identifier to a human readable label using cached metadata.
+         *
+         * @param string $type_slug Game directory slug.
+         * @param string $set_id    Raw set identifier.
+         * @param string $fallback  Fallback label.
+         *
+         * @return string
+         */
+        protected function resolve_set_label( $type_slug, $set_id, $fallback = '' ) {
+            $slug = $this->to_lower( (string) $type_slug );
+            $id   = $this->to_lower( (string) $set_id );
+
+            if ( isset( $this->set_cache[ $slug ] ) && isset( $this->set_cache[ $slug ]['names'][ $id ] ) ) {
+                return $this->set_cache[ $slug ]['names'][ $id ];
+            }
+
+            if ( '' !== $fallback ) {
+                return $this->derive_set_name( $fallback );
+            }
+
+            return $this->derive_set_name( $id );
         }
 
         /**
