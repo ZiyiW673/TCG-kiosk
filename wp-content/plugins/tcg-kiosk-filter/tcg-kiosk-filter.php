@@ -178,6 +178,11 @@ class TCG_Kiosk_Filter_Plugin {
     overflow: hidden;
 }
 
+header {
+    padding: 0 10px 10px 10px;
+    border-bottom: 1px solid grey;
+}
+
 .tcg-kiosk__header {
     display: flex;
     align-items: flex-start;
@@ -190,6 +195,7 @@ class TCG_Kiosk_Filter_Plugin {
     align-items: flex-end;
     flex-wrap: wrap;
     gap: 1rem;
+    margin-top: 30px;
 }
 
 .tcg-kiosk__type-filter {
@@ -197,6 +203,7 @@ class TCG_Kiosk_Filter_Plugin {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    margin-top: 15px;
 }
 
 .tcg-kiosk__type-filter[hidden] {
@@ -473,7 +480,7 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk__type-button--large-icon {
-    min-width: 4.5rem;
+    min-width: 2.5rem;
     border: none;
 }
 
@@ -489,7 +496,7 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk__type-button--large-icon .tcg-kiosk__type-button-image {
-    max-height: 3.75rem;
+    height: 25px;
 }
 
 .tcg-kiosk__type-button--compact-icon .tcg-kiosk__type-button-image {
@@ -546,12 +553,17 @@ class TCG_Kiosk_Filter_Plugin {
 .tcg-kiosk__actions {
     flex: 0 0 25%;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 1rem;
+    margin-top: 14px;
 }
 
 .tcg-kiosk__search {
     position: relative;
+    display: flex;
+    width: 80%;
+    height: 80%;
+    margin-top: 16px;
 }
 
 .tcg-kiosk__search input[type="search"] {
@@ -563,6 +575,10 @@ class TCG_Kiosk_Filter_Plugin {
     flex-direction: column;
     font-weight: 600;
     color: #1d2327;
+    width: 18%;
+    margin-right: 0;
+    margin-left: auto;
+    font-size: 9px;
 }
 
 .tcg-kiosk__page-size select {
