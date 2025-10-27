@@ -214,8 +214,23 @@ class TCG_Kiosk_Filter_Plugin {
 
 .tcg-kiosk__type-options {
     display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.tcg-kiosk__type-row {
+    display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+    justify-content: flex-start;
+}
+
+.tcg-kiosk__type-row--primary {
+    justify-content: center;
+}
+
+.tcg-kiosk__type-row--trainer {
+    justify-content: center;
 }
 
 .tcg-kiosk__overlay {
@@ -1435,6 +1450,7 @@ CSS;
     const presetOptions = Array.isArray( selected.typeOptions ) ? selected.typeOptions : [];
     const template = i18n.allTypeTemplate || 'All %s';
     const allLabel = template.includes( '%s' ) ? template.replace( '%s', label ) : template;
+    const includeAllOption = selected.typeIncludeAllOption !== false;
     const options = [];
 
     if ( presetOptions.length ) {
@@ -1454,7 +1470,21 @@ CSS;
           return;
         }
 
-        options.push( { value, label: option.label || value } );
+        const entry = { value, label: option.label || value };
+
+        if ( Object.prototype.hasOwnProperty.call( option, 'row' ) ) {
+          const rawRow = option.row;
+
+          if ( 'string' === typeof rawRow || 'number' === typeof rawRow ) {
+            const normalizedRow = String( rawRow ).trim();
+
+            if ( normalizedRow ) {
+              entry.row = normalizedRow;
+            }
+          }
+        }
+
+        options.push( entry );
       } );
     } else {
       const typeValues = new Set();
@@ -1484,10 +1514,56 @@ CSS;
       return;
     }
 
-    typeOptionsContainer.appendChild( createTypeButton( '', allLabel ) );
+    const rowContainers = new Map();
+    const DEFAULT_ROW_KEY = '__default__';
+
+    function normalizeRowKey( value ) {
+      if ( 'string' === typeof value || 'number' === typeof value ) {
+        const normalized = String( value ).trim();
+
+        if ( normalized ) {
+          return normalized;
+        }
+      }
+
+      return '';
+    }
+
+    function appendToRow( element, rawRowKey ) {
+      const normalizedKey = normalizeRowKey( rawRowKey );
+      const resolvedKey = normalizedKey || DEFAULT_ROW_KEY;
+      let row = rowContainers.get( resolvedKey );
+
+      if ( ! row ) {
+        row = document.createElement( 'div' );
+        row.className = 'tcg-kiosk__type-row';
+
+        if ( resolvedKey !== DEFAULT_ROW_KEY ) {
+          const modifier = normalizeTypeIconKey( resolvedKey );
+
+          if ( modifier ) {
+            row.classList.add( `tcg-kiosk__type-row--${modifier}` );
+          }
+
+          row.dataset.rowKey = resolvedKey;
+        }
+
+        rowContainers.set( resolvedKey, row );
+      }
+
+      if ( ! row.isConnected ) {
+        typeOptionsContainer.appendChild( row );
+      }
+
+      row.appendChild( element );
+    }
+
+    if ( includeAllOption ) {
+      appendToRow( createTypeButton( '', allLabel ) );
+    }
 
     options.forEach( ( option ) => {
-      typeOptionsContainer.appendChild( createTypeButton( option.value, option.label ) );
+      appendToRow( createTypeButton( option.value, option.label ), option.row );
     } );
 
     updateActiveTypeButton();

@@ -70,15 +70,16 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 $context = $this->get_set_context( $type_slug, $directory );
 
                 $data['cards'][] = array(
-                    'slug'                => $type_slug,
-                    'label'               => $this->humanize_label( $type_slug ),
-                    'typeLabel'           => $config['label'],
-                    'typeOptions'         => $config['options'],
-                    'typeMatchMode'       => $config['match_mode'],
-                    'typeCaseInsensitive' => $config['case_insensitive'],
-                    'overlayImage'        => $this->get_overlay_image_url( $type_slug ),
-                    'setOrder'            => isset( $context['order'] ) && is_array( $context['order'] ) ? array_values( $context['order'] ) : array(),
-                    'cards'               => $cards,
+                    'slug'                   => $type_slug,
+                    'label'                  => $this->humanize_label( $type_slug ),
+                    'typeLabel'              => $config['label'],
+                    'typeOptions'            => $config['options'],
+                    'typeIncludeAllOption'   => array_key_exists( 'include_all_option', $config ) ? (bool) $config['include_all_option'] : true,
+                    'typeMatchMode'          => $config['match_mode'],
+                    'typeCaseInsensitive'    => $config['case_insensitive'],
+                    'overlayImage'           => $this->get_overlay_image_url( $type_slug ),
+                    'setOrder'               => isset( $context['order'] ) && is_array( $context['order'] ) ? array_values( $context['order'] ) : array(),
+                    'cards'                  => $cards,
                 );
             }
 
@@ -182,12 +183,89 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
 
             if ( false !== strpos( $slug, 'pokemon' ) ) {
                 return array(
-                    'label'            => __( 'Type', 'tcg-kiosk-filter' ),
-                    'field'            => 'types',
-                    'options'          => array(),
-                    'match_mode'       => 'exact',
-                    'case_insensitive' => false,
-                    'trainer_subtypes' => array(
+                    'label'              => __( 'Type', 'tcg-kiosk-filter' ),
+                    'field'              => 'types',
+                    'options'            => array(
+                        array(
+                            'value' => 'Colorless',
+                            'label' => __( 'Colorless', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Darkness',
+                            'label' => __( 'Darkness', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Dragon',
+                            'label' => __( 'Dragon', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Fairy',
+                            'label' => __( 'Fairy', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Fighting',
+                            'label' => __( 'Fighting', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Fire',
+                            'label' => __( 'Fire', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Grass',
+                            'label' => __( 'Grass', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Lightning',
+                            'label' => __( 'Lightning', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Metal',
+                            'label' => __( 'Metal', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Psychic',
+                            'label' => __( 'Psychic', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Water',
+                            'label' => __( 'Water', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Pokémon Tool',
+                            'label' => __( 'Pokémon Tool', 'tcg-kiosk-filter' ),
+                            'row'   => 'trainer',
+                        ),
+                        array(
+                            'value' => 'Stadium',
+                            'label' => __( 'Stadium', 'tcg-kiosk-filter' ),
+                            'row'   => 'trainer',
+                        ),
+                        array(
+                            'value' => 'Supporter',
+                            'label' => __( 'Supporter', 'tcg-kiosk-filter' ),
+                            'row'   => 'trainer',
+                        ),
+                        array(
+                            'value' => 'Item',
+                            'label' => __( 'Item', 'tcg-kiosk-filter' ),
+                            'row'   => 'trainer',
+                        ),
+                    ),
+                    'include_all_option' => false,
+                    'match_mode'         => 'exact',
+                    'case_insensitive'   => false,
+                    'trainer_subtypes'   => array(
                         'supporter'    => 'Supporter',
                         'stadium'      => 'Stadium',
                         'pokémon tool' => 'Pokémon Tool',
