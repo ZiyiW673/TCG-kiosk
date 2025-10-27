@@ -194,7 +194,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         'pokemon tool' => 'Pokémon Tool',
                         'item'         => 'Item',
                     ),
-                    'energy_supertype' => 'Energy',
                 );
             }
 
@@ -390,17 +389,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         if ( isset( $allowed_subtypes[ $key ] ) ) {
                             $normalized[] = $allowed_subtypes[ $key ];
                         }
-                    }
-                }
-            }
-
-            if ( ! empty( $config['energy_supertype'] ) && ! empty( $card['supertype'] ) ) {
-                $configured_supertype = trim( preg_replace( '/\s+/', ' ', (string) $config['energy_supertype'] ) );
-                $card_supertype       = trim( preg_replace( '/\s+/', ' ', (string) $card['supertype'] ) );
-
-                if ( '' !== $configured_supertype && '' !== $card_supertype ) {
-                    if ( $this->to_lower( $card_supertype ) === $this->to_lower( $configured_supertype ) ) {
-                        $normalized[] = $configured_supertype;
                     }
                 }
             }
