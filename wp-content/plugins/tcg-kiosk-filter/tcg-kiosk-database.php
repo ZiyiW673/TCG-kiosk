@@ -187,6 +187,14 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     'options'          => array(),
                     'match_mode'       => 'exact',
                     'case_insensitive' => false,
+                    'trainer_subtypes' => array(
+                        'supporter'    => 'Supporter',
+                        'stadium'      => 'Stadium',
+                        'pokémon tool' => 'Pokémon Tool',
+                        'pokemon tool' => 'Pokémon Tool',
+                        'item'         => 'Item',
+                    ),
+                    'energy_supertype' => 'Energy',
                 );
             }
 
@@ -331,11 +339,71 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     break;
             }
 
-            if ( empty( $values ) ) {
-                return array();
+            $normalized = array();
+
+            if ( ! empty( $config['trainer_subtypes'] ) && ! empty( $card['subtypes'] ) && is_array( $card['subtypes'] ) ) {
+                $allowed_subtypes = array();
+
+                foreach ( $config['trainer_subtypes'] as $configured_key => $configured_label ) {
+                    $raw_key   = is_int( $configured_key ) ? $configured_label : $configured_key;
+                    $raw_label = $configured_label;
+
+                    if ( is_array( $raw_key ) || ( ! is_string( $raw_key ) && ! is_numeric( $raw_key ) ) ) {
+                        continue;
+                    }
+
+                    $clean_key = trim( preg_replace( '/\s+/', ' ', (string) $raw_key ) );
+
+                    if ( '' === $clean_key ) {
+                        continue;
+                    }
+
+                    if ( is_array( $raw_label ) ) {
+                        continue;
+                    }
+
+                    $clean_label = ( is_string( $raw_label ) || is_numeric( $raw_label ) )
+                        ? trim( preg_replace( '/\s+/', ' ', (string) $raw_label ) )
+                        : '';
+
+                    if ( '' === $clean_label ) {
+                        $clean_label = $clean_key;
+                    }
+
+                    $allowed_subtypes[ $this->to_lower( $clean_key ) ] = $clean_label;
+                }
+
+                if ( ! empty( $allowed_subtypes ) ) {
+                    foreach ( $card['subtypes'] as $subtype ) {
+                        if ( ! is_string( $subtype ) && ! is_numeric( $subtype ) ) {
+                            continue;
+                        }
+
+                        $clean_subtype = trim( preg_replace( '/\s+/', ' ', (string) $subtype ) );
+
+                        if ( '' === $clean_subtype ) {
+                            continue;
+                        }
+
+                        $key = $this->to_lower( $clean_subtype );
+
+                        if ( isset( $allowed_subtypes[ $key ] ) ) {
+                            $normalized[] = $allowed_subtypes[ $key ];
+                        }
+                    }
+                }
             }
 
-            $normalized = array();
+            if ( ! empty( $config['energy_supertype'] ) && ! empty( $card['supertype'] ) ) {
+                $configured_supertype = trim( preg_replace( '/\s+/', ' ', (string) $config['energy_supertype'] ) );
+                $card_supertype       = trim( preg_replace( '/\s+/', ' ', (string) $card['supertype'] ) );
+
+                if ( '' !== $configured_supertype && '' !== $card_supertype ) {
+                    if ( $this->to_lower( $card_supertype ) === $this->to_lower( $configured_supertype ) ) {
+                        $normalized[] = $configured_supertype;
+                    }
+                }
+            }
 
             foreach ( $values as $value ) {
                 if ( is_string( $value ) || is_numeric( $value ) ) {
