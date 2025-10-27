@@ -347,9 +347,11 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk__overlay-options {
-    display: grid;
+    display: flex;
     gap: 1.5rem;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    justify-content: center;
+    align-items: stretch;
+    flex-wrap: wrap;
 }
 
 .tcg-kiosk__overlay-button {
