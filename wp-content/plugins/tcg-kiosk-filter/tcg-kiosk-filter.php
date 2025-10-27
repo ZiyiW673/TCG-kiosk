@@ -112,6 +112,24 @@ class TCG_Kiosk_Filter_Plugin {
         wp_add_inline_script( 'tcg-kiosk-filter', $this->get_inline_script() );
 
         $data = $this->database->get_tcg_data();
+        $type_icon_base_url = trailingslashit( plugins_url( 'assets/icon', __FILE__ ) );
+        $type_icon_map      = array(
+            'colorless'    => 'colorless.png',
+            'darkness'     => 'darkness.png',
+            'dragon'       => 'dragon.png',
+            'fairy'        => 'fairy.png',
+            'fighting'     => 'fighting.png',
+            'fire'         => 'fire.png',
+            'grass'        => 'grass.png',
+            'item'         => 'item.png',
+            'lightning'    => 'lightning.png',
+            'metal'        => 'metal.png',
+            'pokemon_tool' => 'pokemon_tool.png',
+            'psychic'      => 'psychic.png',
+            'stadium'      => 'stadium.png',
+            'supporter'    => 'supporter.png',
+            'water'        => 'water.png',
+        );
 
         wp_localize_script(
             'tcg-kiosk-filter',
@@ -119,6 +137,10 @@ class TCG_Kiosk_Filter_Plugin {
             array(
                 'cards'        => $data['cards'],
                 'lastModified' => $data['lastModified'],
+                'typeIcons'    => array(
+                    'baseUrl' => $type_icon_base_url,
+                    'map'     => $type_icon_map,
+                ),
                 'i18n'         => array(
                     'allSets'  => __( 'All Sets', 'tcg-kiosk-filter' ),
                     'allTypeTemplate' => __( 'All %s', 'tcg-kiosk-filter' ),
@@ -424,6 +446,10 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk__type-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 999px;
     border: 1px solid #ccd0d4;
     background-color: #fff;
@@ -432,6 +458,30 @@ class TCG_Kiosk_Filter_Plugin {
     font-size: 13px;
     cursor: pointer;
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    min-height: 2.25rem;
+}
+
+.tcg-kiosk__type-button--has-icon {
+    padding: 0.25rem;
+    min-width: 3.5rem;
+}
+
+.tcg-kiosk__type-button-image {
+    display: block;
+    max-height: 2.25rem;
+    width: auto;
+}
+
+.tcg-kiosk__type-button-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .tcg-kiosk__type-button:hover,
@@ -689,6 +739,9 @@ CSS;
   const cardOverlayTitle = document.getElementById( 'tcg-kiosk-detail-title' );
   const cardOverlayDetails = document.getElementById( 'tcg-kiosk-detail-metadata' );
   const cardOverlayClose = document.getElementById( 'tcg-kiosk-detail-close' );
+  const typeIconConfig = window.tcgKioskData.typeIcons || {};
+  const typeIconBaseUrl = 'string' === typeof typeIconConfig.baseUrl ? typeIconConfig.baseUrl : '';
+  const typeIconMap = typeIconConfig.map && 'object' === typeof typeIconConfig.map ? typeIconConfig.map : {};
 
   if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeFilterLabel || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
@@ -717,6 +770,58 @@ CSS;
     option.value = value;
     option.textContent = label;
     return option;
+  }
+
+  function normalizeTypeIconKey( value ) {
+    if ( 'string' !== typeof value && 'number' !== typeof value ) {
+      return '';
+    }
+
+    let processed = String( value ).trim().toLowerCase();
+
+    if ( ! processed ) {
+      return '';
+    }
+
+    if ( processed.normalize ) {
+      processed = processed.normalize( 'NFD' );
+    }
+
+    processed = processed.replace( /[\u0300-\u036f]/g, '' );
+    processed = processed.replace( /[^a-z0-9]+/g, '_' );
+    processed = processed.replace( /^_+|_+$/g, '' );
+
+    return processed;
+  }
+
+  function getTypeIconUrl( label, value ) {
+    if ( ! typeIconBaseUrl || ! typeIconMap || 'object' !== typeof typeIconMap ) {
+      return '';
+    }
+
+    const candidates = [];
+
+    if ( value ) {
+      candidates.push( value );
+    }
+
+    if ( label && label !== value ) {
+      candidates.push( label );
+    }
+
+    for ( let index = 0; index < candidates.length; index += 1 ) {
+      const key = normalizeTypeIconKey( candidates[ index ] );
+
+      if ( key && Object.prototype.hasOwnProperty.call( typeIconMap, key ) ) {
+        const file = typeIconMap[ key ];
+
+        if ( file ) {
+          return typeIconBaseUrl + file;
+        }
+      }
+    }
+
+    return '';
   }
 
   function populateGameOptions() {
@@ -1179,8 +1284,30 @@ CSS;
     button.type = 'button';
     button.className = 'tcg-kiosk__type-button';
     button.dataset.value = value;
-    button.textContent = label;
     button.setAttribute( 'aria-pressed', 'false' );
+    button.title = label;
+
+    const iconUrl = getTypeIconUrl( label, value );
+
+    if ( iconUrl ) {
+      button.classList.add( 'tcg-kiosk__type-button--has-icon' );
+
+      const image = document.createElement( 'img' );
+      image.className = 'tcg-kiosk__type-button-image';
+      image.src = iconUrl;
+      image.alt = '';
+      image.loading = 'lazy';
+      image.setAttribute( 'aria-hidden', 'true' );
+      button.appendChild( image );
+
+      const hiddenLabel = document.createElement( 'span' );
+      hiddenLabel.className = 'tcg-kiosk__type-button-text';
+      hiddenLabel.textContent = label;
+      button.appendChild( hiddenLabel );
+    } else {
+      button.textContent = label;
+    }
+
     button.addEventListener( 'click', () => {
       if ( value && selectedTypeValue === value ) {
         selectedTypeValue = '';
