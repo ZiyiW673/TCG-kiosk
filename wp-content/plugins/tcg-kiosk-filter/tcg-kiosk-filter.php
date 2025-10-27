@@ -187,6 +187,8 @@ header {
     display: flex;
     align-items: flex-start;
     gap: var(--tcg-gap);
+    padding: 0 10px 10px 10px;
+    border-bottom: 1px solid grey;
 }
 
 .tcg-kiosk__filters {
