@@ -114,21 +114,17 @@ class TCG_Kiosk_Filter_Plugin {
         $data = $this->database->get_tcg_data();
         $type_icon_base_url = trailingslashit( plugins_url( 'assets/icon', __FILE__ ) );
         $type_icon_map      = array(
-            'colorless'    => 'colorless.png',
-            'darkness'     => 'darkness.png',
-            'dragon'       => 'dragon.png',
-            'fairy'        => 'fairy.png',
-            'fighting'     => 'fighting.png',
-            'fire'         => 'fire.png',
-            'grass'        => 'grass.png',
-            'item'         => 'item.png',
-            'lightning'    => 'lightning.png',
-            'metal'        => 'metal.png',
-            'pokemon_tool' => 'pokemon_tool.png',
-            'psychic'      => 'psychic.png',
-            'stadium'      => 'stadium.png',
-            'supporter'    => 'supporter.png',
-            'water'        => 'water.png',
+            'colorless' => 'colorless.png',
+            'darkness'  => 'darkness.png',
+            'dragon'    => 'dragon.png',
+            'fairy'     => 'fairy.png',
+            'fighting'  => 'fighting.png',
+            'fire'      => 'fire.png',
+            'grass'     => 'grass.png',
+            'lightning' => 'lightning.png',
+            'metal'     => 'metal.png',
+            'psychic'   => 'psychic.png',
+            'water'     => 'water.png',
         );
 
         wp_localize_script(
@@ -482,7 +478,8 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk__type-button--large-icon {
-    min-width: 4rem;
+    min-width: 4.5rem;
+    border: none;
 }
 
 .tcg-kiosk__type-button--compact-icon {
@@ -497,7 +494,7 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk__type-button--large-icon .tcg-kiosk__type-button-image {
-    max-height: 3rem;
+    max-height: 3.75rem;
 }
 
 .tcg-kiosk__type-button--compact-icon .tcg-kiosk__type-button-image {
