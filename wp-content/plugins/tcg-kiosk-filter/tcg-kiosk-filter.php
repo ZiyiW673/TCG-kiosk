@@ -348,10 +348,11 @@ class TCG_Kiosk_Filter_Plugin {
 
 .tcg-kiosk__overlay-options {
     display: flex;
+    flex-direction: row;
     gap: 1.5rem;
     justify-content: center;
     align-items: stretch;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .tcg-kiosk__overlay-button {
