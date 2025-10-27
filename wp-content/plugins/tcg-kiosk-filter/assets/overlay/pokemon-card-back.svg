@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 1050">
+  <defs>
+    <radialGradient id="poke-bg" cx="0.5" cy="0.4" r="0.75">
+      <stop offset="0%" stop-color="#4b73d0" />
+      <stop offset="55%" stop-color="#1c3c93" />
+      <stop offset="100%" stop-color="#0c1c4f" />
+    </radialGradient>
+    <radialGradient id="poke-glow" cx="0.5" cy="0.45" r="0.4">
+      <stop offset="0%" stop-color="#f6f8ff" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="750" height="1050" rx="38" fill="url(#poke-bg)" />
+  <rect x="32" y="32" width="686" height="986" rx="32" fill="none" stroke="#f4c31b" stroke-width="18" opacity="0.9" />
+  <ellipse cx="375" cy="525" rx="260" ry="320" fill="#103283" opacity="0.75" />
+  <circle cx="375" cy="525" r="210" fill="#123f98" />
+  <circle cx="375" cy="525" r="170" fill="url(#poke-glow)" />
+  <g transform="translate(375 525)">
+    <circle r="150" fill="#f6f6f6" stroke="#1a1a1a" stroke-width="12" />
+    <path d="M-150 0h300" stroke="#1a1a1a" stroke-width="28" />
+    <path d="M-150 0h300" stroke="#b51d23" stroke-width="90" />
+    <circle r="75" fill="#ffffff" stroke="#1a1a1a" stroke-width="16" />
+    <circle r="38" fill="#dfe7ff" stroke="#1a1a1a" stroke-width="10" />
+  </g>
+  <g fill="#f4c31b" font-family="'Futura', 'Arial Black', sans-serif" font-size="110" font-weight="700" letter-spacing="10">
+    <text text-anchor="middle" x="375" y="250">POKÉMON</text>
+    <text text-anchor="middle" x="375" y="830" transform="rotate(180 375 830)">POKÉMON</text>
+  </g>
+</svg>

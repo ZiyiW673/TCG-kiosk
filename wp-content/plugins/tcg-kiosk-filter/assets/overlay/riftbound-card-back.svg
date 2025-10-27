@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 1050">
+  <defs>
+    <linearGradient id="rb-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e6edf0" />
+    </linearGradient>
+    <linearGradient id="rb-line" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2f7a83" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#0b3f46" stop-opacity="0.1" />
+    </linearGradient>
+  </defs>
+  <rect width="750" height="1050" rx="36" fill="url(#rb-bg)" />
+  <rect x="36" y="36" width="678" height="978" rx="30" fill="none" stroke="#0c5f6c" stroke-width="14" opacity="0.5" />
+  <g stroke="url(#rb-line)" stroke-width="6">
+    <path d="M150 200C250 260 500 160 620 240" />
+    <path d="M120 380C200 430 480 330 610 400" />
+    <path d="M130 560C240 620 520 500 610 560" />
+    <path d="M140 740C250 800 520 690 610 750" />
+    <path d="M160 890C270 940 500 830 600 900" />
+  </g>
+  <g fill="none" stroke="#0c5f6c" stroke-width="12">
+    <path d="M375 250L560 525L375 800L190 525Z" />
+    <path d="M375 330L500 525L375 720L250 525Z" />
+    <circle cx="375" cy="525" r="78" />
+    <path d="M375 447v156" />
+    <path d="M297 525h156" />
+  </g>
+  <g fill="#0c5f6c" font-family="'Gotham', 'Montserrat', sans-serif" font-size="64" font-weight="700" letter-spacing="6">
+    <text x="375" y="910" text-anchor="middle">LEAGUE OF LEGENDS</text>
+  </g>
+</svg>
