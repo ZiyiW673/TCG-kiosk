@@ -466,10 +466,27 @@ class TCG_Kiosk_Filter_Plugin {
     min-width: 3.5rem;
 }
 
+.tcg-kiosk__type-button--large-icon {
+    min-width: 4rem;
+}
+
+.tcg-kiosk__type-button--compact-icon {
+    border: none;
+    padding: 0.2rem;
+}
+
 .tcg-kiosk__type-button-image {
     display: block;
     max-height: 2.25rem;
     width: auto;
+}
+
+.tcg-kiosk__type-button--large-icon .tcg-kiosk__type-button-image {
+    max-height: 3rem;
+}
+
+.tcg-kiosk__type-button--compact-icon .tcg-kiosk__type-button-image {
+    max-height: 1.5rem;
 }
 
 .tcg-kiosk__type-button-text {
@@ -742,6 +759,25 @@ CSS;
   const typeIconConfig = window.tcgKioskData.typeIcons || {};
   const typeIconBaseUrl = 'string' === typeof typeIconConfig.baseUrl ? typeIconConfig.baseUrl : '';
   const typeIconMap = typeIconConfig.map && 'object' === typeof typeIconConfig.map ? typeIconConfig.map : {};
+  const LARGE_TYPE_ICON_KEYS = new Set( [
+    'colorless',
+    'darkness',
+    'dragon',
+    'fairy',
+    'fighting',
+    'fire',
+    'grass',
+    'lightning',
+    'metal',
+    'psychic',
+    'water',
+  ] );
+  const COMPACT_TYPE_ICON_KEYS = new Set( [
+    'pokemon_tool',
+    'stadium',
+    'supporter',
+    'item',
+  ] );
 
   if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeFilterLabel || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
@@ -1288,9 +1324,16 @@ CSS;
     button.title = label;
 
     const iconUrl = getTypeIconUrl( label, value );
+    const normalizedIconKey = normalizeTypeIconKey( value ) || normalizeTypeIconKey( label );
 
     if ( iconUrl ) {
       button.classList.add( 'tcg-kiosk__type-button--has-icon' );
+
+      if ( normalizedIconKey && LARGE_TYPE_ICON_KEYS.has( normalizedIconKey ) ) {
+        button.classList.add( 'tcg-kiosk__type-button--large-icon' );
+      } else if ( normalizedIconKey && COMPACT_TYPE_ICON_KEYS.has( normalizedIconKey ) ) {
+        button.classList.add( 'tcg-kiosk__type-button--compact-icon' );
+      }
 
       const image = document.createElement( 'img' );
       image.className = 'tcg-kiosk__type-button-image';
