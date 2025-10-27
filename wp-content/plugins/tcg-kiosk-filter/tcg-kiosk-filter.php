@@ -203,11 +203,6 @@ class TCG_Kiosk_Filter_Plugin {
     display: none;
 }
 
-.tcg-kiosk__type-filter-label {
-    font-weight: 600;
-    color: #1d2327;
-}
-
 .tcg-kiosk__type-options {
     display: flex;
     flex-direction: column;
@@ -751,7 +746,6 @@ CSS;
   const gameSelect = document.getElementById( 'tcg-kiosk-game' );
   const setSelect = document.getElementById( 'tcg-kiosk-set' );
   const typeFilterWrapper = document.getElementById( 'tcg-kiosk-type-filter' );
-  const typeFilterLabel = document.getElementById( 'tcg-kiosk-type-label' );
   const typeOptionsContainer = document.getElementById( 'tcg-kiosk-type-options' );
   const searchInput = document.getElementById( 'tcg-kiosk-search' );
   const pageSizeSelect = document.getElementById( 'tcg-kiosk-page-size' );
@@ -791,12 +785,17 @@ CSS;
     'item',
   ] );
 
-  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeFilterLabel || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
+  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
   }
 
   const data = window.tcgKioskData.cards;
   const i18n = window.tcgKioskData.i18n || {};
+  const DEFAULT_TYPE_LABEL =
+    ( typeFilterWrapper.dataset && typeFilterWrapper.dataset.defaultLabel ) ||
+    i18n.typeLabel ||
+    'Type';
+  let currentTypeLabel = DEFAULT_TYPE_LABEL;
   const DEFAULT_PAGE_SIZE = parseInt( pageSizeSelect.value, 10 ) || 10;
   let cardsPerPage = DEFAULT_PAGE_SIZE;
   let hasInteracted = false;
@@ -982,9 +981,9 @@ CSS;
     }
 
     if ( Array.isArray( card.typeValues ) && card.typeValues.length ) {
-      const typeLabel = typeFilterLabel && typeFilterLabel.textContent ? typeFilterLabel.textContent.trim() : '';
+      const typeLabel = currentTypeLabel || i18n.typeLabel || 'Type';
       entries.push( {
-        label: typeLabel || i18n.typeLabel || 'Type',
+        label: typeLabel,
         value: card.typeValues.join( ', ' ),
       } );
     }
@@ -1426,8 +1425,8 @@ CSS;
     typeOptionsContainer.innerHTML = '';
     typeFilterWrapper.hidden = true;
 
-    const defaultLabel = typeFilterWrapper.dataset.defaultLabel || 'Type';
-    typeFilterLabel.textContent = defaultLabel;
+    const defaultLabel = DEFAULT_TYPE_LABEL;
+    currentTypeLabel = defaultLabel;
 
     const typeValue = gameSelect.value;
 
@@ -1442,11 +1441,11 @@ CSS;
     }
 
     const label = selected.typeLabel || defaultLabel;
-    typeFilterLabel.textContent = label;
+    currentTypeLabel = label;
 
     const presetOptions = Array.isArray( selected.typeOptions ) ? selected.typeOptions : [];
     const template = i18n.allTypeTemplate || 'All %s';
-    const allLabel = template.includes( '%s' ) ? template.replace( '%s', label ) : template;
+    const allLabel = template.includes( '%s' ) ? template.replace( '%s', currentTypeLabel ) : template;
     const includeAllOption = selected.typeIncludeAllOption !== false;
     const options = [];
 
@@ -1903,20 +1902,17 @@ JS;
             <header class="tcg-kiosk__header">
                 <div class="tcg-kiosk__filters" role="group" aria-label="<?php esc_attr_e( 'Filter cards', 'tcg-kiosk-filter' ); ?>">
                     <label>
-                        <span><?php esc_html_e( 'Trading Card Game', 'tcg-kiosk-filter' ); ?></span>
-                        <select id="tcg-kiosk-game" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'Choose a game', 'tcg-kiosk-filter' ); ?>">
+                        <select id="tcg-kiosk-game" class="tcg-kiosk__select" aria-label="<?php esc_attr_e( 'Trading Card Game', 'tcg-kiosk-filter' ); ?>" data-placeholder="<?php echo esc_attr__( 'Choose a game', 'tcg-kiosk-filter' ); ?>">
                             <option value="" disabled selected hidden><?php esc_html_e( 'Choose a game', 'tcg-kiosk-filter' ); ?></option>
                         </select>
                     </label>
                     <label>
-                        <span><?php esc_html_e( 'Set', 'tcg-kiosk-filter' ); ?></span>
-                        <select id="tcg-kiosk-set" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Sets', 'tcg-kiosk-filter' ); ?>" disabled>
+                        <select id="tcg-kiosk-set" class="tcg-kiosk__select" aria-label="<?php esc_attr_e( 'Set', 'tcg-kiosk-filter' ); ?>" data-placeholder="<?php echo esc_attr__( 'All Sets', 'tcg-kiosk-filter' ); ?>" disabled>
                             <option value=""><?php esc_html_e( 'All Sets', 'tcg-kiosk-filter' ); ?></option>
                         </select>
                     </label>
                 </div>
-                <div id="tcg-kiosk-type-filter" class="tcg-kiosk__type-filter" role="group" aria-labelledby="tcg-kiosk-type-label" data-default-label="<?php echo esc_attr__( 'Type', 'tcg-kiosk-filter' ); ?>" hidden>
-                    <span id="tcg-kiosk-type-label" class="tcg-kiosk__type-filter-label"><?php esc_html_e( 'Type', 'tcg-kiosk-filter' ); ?></span>
+                <div id="tcg-kiosk-type-filter" class="tcg-kiosk__type-filter" role="group" aria-label="<?php esc_attr_e( 'Type', 'tcg-kiosk-filter' ); ?>" data-default-label="<?php echo esc_attr__( 'Type', 'tcg-kiosk-filter' ); ?>" hidden>
                     <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
                 </div>
                 <div class="tcg-kiosk__actions">
