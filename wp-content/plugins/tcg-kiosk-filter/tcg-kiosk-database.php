@@ -27,6 +27,20 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
         protected $set_cache = array();
 
         /**
+         * Cached lookup of card identifiers that exist as WooCommerce products.
+         *
+         * @var array|null
+         */
+        protected $product_card_lookup = null;
+
+        /**
+         * Whether the WooCommerce product lookup has been initialised.
+         *
+         * @var bool
+         */
+        protected $product_card_lookup_ready = false;
+
+        /**
          * TCG_Kiosk_Database constructor.
          *
          * @param string $database_path Absolute path to the database directory.
@@ -147,6 +161,10 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         continue;
                     }
 
+                    if ( ! $this->should_include_card( $card, $type_slug ) ) {
+                        continue;
+                    }
+
                     $image_sources = $this->prepare_image_sources( $card['images'] );
 
                     if ( empty( $image_sources['primary'] ) ) {
@@ -169,6 +187,331 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             }
 
             return $cards;
+        }
+
+        /**
+         * Determine whether the given card should be included based on WooCommerce products.
+         *
+         * @param array  $card      Raw card payload.
+         * @param string $type_slug Current game slug.
+         *
+         * @return bool
+         */
+        protected function should_include_card( array $card, $type_slug ) {
+            $lookup = $this->get_product_card_lookup();
+
+            if ( null === $lookup ) {
+                return true;
+            }
+
+            if ( empty( $lookup ) ) {
+                return apply_filters( 'tcg_kiosk_should_include_card', false, $card, $type_slug, $lookup );
+            }
+
+            $include   = false;
+            $candidates = $this->get_card_identifier_candidates( $card, $type_slug );
+
+            foreach ( $candidates as $candidate ) {
+                $normalized = $this->normalize_card_identifier( $candidate );
+
+                if ( '' === $normalized ) {
+                    continue;
+                }
+
+                if ( isset( $lookup[ $normalized ] ) ) {
+                    $include = true;
+                    break;
+                }
+            }
+
+            return apply_filters( 'tcg_kiosk_should_include_card', $include, $card, $type_slug, $lookup );
+        }
+
+        /**
+         * Retrieve a lookup of product-backed card identifiers.
+         *
+         * @return array|null
+         */
+        protected function get_product_card_lookup() {
+            if ( $this->product_card_lookup_ready ) {
+                return $this->product_card_lookup;
+            }
+
+            $this->product_card_lookup       = $this->build_product_card_lookup();
+            $this->product_card_lookup_ready = true;
+
+            return $this->product_card_lookup;
+        }
+
+        /**
+         * Build the WooCommerce-backed lookup of card identifiers.
+         *
+         * @return array|null
+         */
+        protected function build_product_card_lookup() {
+            if ( ! class_exists( 'WooCommerce' ) || ! function_exists( 'wc_get_products' ) ) {
+                return null;
+            }
+
+            $query_args = apply_filters(
+                'tcg_kiosk_product_query_args',
+                array(
+                    'limit'  => -1,
+                    'return' => 'ids',
+                    'status' => array( 'publish' ),
+                    'type'   => array( 'simple', 'variable', 'grouped', 'external' ),
+                )
+            );
+
+            $product_ids = wc_get_products( $query_args );
+
+            if ( empty( $product_ids ) ) {
+                return array();
+            }
+
+            $identifiers = array();
+
+            foreach ( $product_ids as $product_id ) {
+                $identifiers = array_merge( $identifiers, $this->extract_identifiers_from_product( $product_id ) );
+            }
+
+            $identifiers = apply_filters( 'tcg_kiosk_product_card_identifiers', $identifiers, $product_ids );
+
+            $lookup = array();
+
+            foreach ( $identifiers as $identifier ) {
+                $normalized = $this->normalize_card_identifier( $identifier );
+
+                if ( '' === $normalized ) {
+                    continue;
+                }
+
+                $lookup[ $normalized ] = true;
+            }
+
+            return apply_filters( 'tcg_kiosk_product_card_lookup', $lookup, $identifiers, $product_ids );
+        }
+
+        /**
+         * Extract candidate identifiers from a WooCommerce product.
+         *
+         * @param int $product_id Product ID.
+         *
+         * @return array
+         */
+        protected function extract_identifiers_from_product( $product_id ) {
+            $identifiers = array();
+            $meta_keys   = apply_filters(
+                'tcg_kiosk_product_card_meta_keys',
+                array(
+                    '_tcg_card_id',
+                    '_tcg_card_ids',
+                    'tcg_card_id',
+                    'tcg_card_ids',
+                ),
+                $product_id
+            );
+
+            foreach ( $meta_keys as $meta_key ) {
+                $value = get_post_meta( $product_id, $meta_key, true );
+
+                if ( empty( $value ) && '0' !== $value ) {
+                    continue;
+                }
+
+                $identifiers = array_merge( $identifiers, $this->extract_identifier_values( $value ) );
+            }
+
+            if ( function_exists( 'wc_get_product' ) ) {
+                $product = wc_get_product( $product_id );
+
+                if ( $product ) {
+                    $sku = $product->get_sku();
+
+                    if ( $sku ) {
+                        $identifiers[] = $sku;
+                    }
+
+                    if ( $product->is_type( 'variable' ) ) {
+                        foreach ( $product->get_children() as $variation_id ) {
+                            $identifiers = array_merge( $identifiers, $this->extract_identifiers_from_variation( $variation_id ) );
+                        }
+                    }
+                }
+            }
+
+            return $identifiers;
+        }
+
+        /**
+         * Extract candidate identifiers from a product variation.
+         *
+         * @param int $variation_id Variation post ID.
+         *
+         * @return array
+         */
+        protected function extract_identifiers_from_variation( $variation_id ) {
+            $identifiers = array();
+            $meta_keys   = apply_filters(
+                'tcg_kiosk_variation_card_meta_keys',
+                array(
+                    '_tcg_card_id',
+                    '_tcg_card_ids',
+                    'tcg_card_id',
+                    'tcg_card_ids',
+                ),
+                $variation_id
+            );
+
+            foreach ( $meta_keys as $meta_key ) {
+                $value = get_post_meta( $variation_id, $meta_key, true );
+
+                if ( empty( $value ) && '0' !== $value ) {
+                    continue;
+                }
+
+                $identifiers = array_merge( $identifiers, $this->extract_identifier_values( $value ) );
+            }
+
+            if ( function_exists( 'wc_get_product' ) ) {
+                $variation = wc_get_product( $variation_id );
+
+                if ( $variation ) {
+                    $sku = $variation->get_sku();
+
+                    if ( $sku ) {
+                        $identifiers[] = $sku;
+                    }
+                }
+            }
+
+            return $identifiers;
+        }
+
+        /**
+         * Flatten identifier values retrieved from post meta.
+         *
+         * @param mixed $value Raw value stored in post meta.
+         *
+         * @return array
+         */
+        protected function extract_identifier_values( $value ) {
+            if ( empty( $value ) && '0' !== $value ) {
+                return array();
+            }
+
+            if ( is_array( $value ) ) {
+                $values = array();
+
+                foreach ( $value as $entry ) {
+                    $values = array_merge( $values, $this->extract_identifier_values( $entry ) );
+                }
+
+                return $values;
+            }
+
+            if ( is_object( $value ) ) {
+                return $this->extract_identifier_values( (array) $value );
+            }
+
+            $string = trim( (string) $value );
+
+            if ( '' === $string ) {
+                return array();
+            }
+
+            $parts = preg_split( '/[\r\n,]+/', $string );
+
+            if ( false === $parts ) {
+                $parts = array( $string );
+            }
+
+            $results = array();
+
+            foreach ( $parts as $part ) {
+                $part = trim( $part );
+
+                if ( '' === $part ) {
+                    continue;
+                }
+
+                $results[] = $part;
+            }
+
+            return $results;
+        }
+
+        /**
+         * Produce the set of identifier candidates for a given card.
+         *
+         * @param array  $card      Raw card payload.
+         * @param string $type_slug Current game slug.
+         *
+         * @return array
+         */
+        protected function get_card_identifier_candidates( array $card, $type_slug ) {
+            $candidates = array();
+
+            if ( isset( $card['id'] ) ) {
+                $candidates[] = $card['id'];
+            }
+
+            if ( isset( $card['number'] ) ) {
+                $number = trim( (string) $card['number'] );
+
+                if ( '' !== $number ) {
+                    if ( isset( $card['set'] ) && is_array( $card['set'] ) ) {
+                        if ( ! empty( $card['set']['id'] ) ) {
+                            $set_id = trim( (string) $card['set']['id'] );
+
+                            if ( '' !== $set_id ) {
+                                $candidates[] = $set_id . '-' . $number;
+                                $candidates[] = $set_id . $number;
+                            }
+                        }
+
+                        if ( ! empty( $card['set']['ptcgoCode'] ) ) {
+                            $ptcgo = trim( (string) $card['set']['ptcgoCode'] );
+
+                            if ( '' !== $ptcgo ) {
+                                $candidates[] = $ptcgo . '-' . $number;
+                                $candidates[] = $ptcgo . $number;
+                            }
+                        }
+                    }
+                }
+            }
+
+            $candidates = array_values( array_unique( array_filter( $candidates ) ) );
+
+            return apply_filters( 'tcg_kiosk_card_identifier_candidates', $candidates, $card, $type_slug );
+        }
+
+        /**
+         * Normalise an identifier for comparison.
+         *
+         * @param mixed $value Identifier candidate.
+         *
+         * @return string
+         */
+        protected function normalize_card_identifier( $value ) {
+            if ( ! is_string( $value ) && ! is_numeric( $value ) ) {
+                return '';
+            }
+
+            $string = trim( (string) $value );
+
+            if ( '' === $string ) {
+                return '';
+            }
+
+            $string = preg_replace( '/\s+/', '', $string );
+
+            if ( null === $string ) {
+                $string = trim( (string) $value );
+            }
+
+            return $this->to_lower( $string );
         }
 
         /**
