@@ -620,36 +620,74 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
 
             if ( false !== strpos( $slug, 'one-piece' ) ) {
                 return array(
-                    'label'            => __( 'Color', 'tcg-kiosk-filter' ),
-                    'field'            => 'color',
-                    'options'          => array(
+                    'label'              => __( 'Color', 'tcg-kiosk-filter' ),
+                    'field'              => array(
+                        'color',
                         array(
-                            'value' => 'black',
-                            'label' => __( 'Black', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'blue',
-                            'label' => __( 'Blue', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'green',
-                            'label' => __( 'Green', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'purple',
-                            'label' => __( 'Purple', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'red',
-                            'label' => __( 'Red', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'yellow',
-                            'label' => __( 'Yellow', 'tcg-kiosk-filter' ),
+                            'name' => 'type',
+                            'map'  => array(
+                                'leader'    => __( 'Leader', 'tcg-kiosk-filter' ),
+                                'character' => __( 'Character', 'tcg-kiosk-filter' ),
+                                'event'     => __( 'Event', 'tcg-kiosk-filter' ),
+                                'stage'     => __( 'Stage', 'tcg-kiosk-filter' ),
+                            ),
                         ),
                     ),
-                    'match_mode'       => 'contains',
-                    'case_insensitive' => true,
+                    'options'            => array(
+                        array(
+                            'value' => 'Black',
+                            'label' => __( 'Black', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Blue',
+                            'label' => __( 'Blue', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Green',
+                            'label' => __( 'Green', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Purple',
+                            'label' => __( 'Purple', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Red',
+                            'label' => __( 'Red', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Yellow',
+                            'label' => __( 'Yellow', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Leader',
+                            'label' => __( 'Leader', 'tcg-kiosk-filter' ),
+                            'row'   => 'types',
+                        ),
+                        array(
+                            'value' => 'Character',
+                            'label' => __( 'Character', 'tcg-kiosk-filter' ),
+                            'row'   => 'types',
+                        ),
+                        array(
+                            'value' => 'Event',
+                            'label' => __( 'Event', 'tcg-kiosk-filter' ),
+                            'row'   => 'types',
+                        ),
+                        array(
+                            'value' => 'Stage',
+                            'label' => __( 'Stage', 'tcg-kiosk-filter' ),
+                            'row'   => 'types',
+                        ),
+                    ),
+                    'include_all_option' => false,
+                    'match_mode'         => 'contains',
+                    'case_insensitive'   => true,
                 );
             }
 
@@ -735,28 +773,123 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          * @return array
          */
         protected function extract_type_values( array $card, array $config ) {
-            $values = array();
+            $values      = array();
+            $field_specs = array();
 
-            switch ( $config['field'] ) {
-                case 'types':
-                    if ( ! empty( $card['types'] ) && is_array( $card['types'] ) ) {
-                        $values = $card['types'];
+            if ( isset( $config['field'] ) && is_array( $config['field'] ) ) {
+                foreach ( $config['field'] as $field_entry ) {
+                    if ( is_array( $field_entry ) ) {
+                        $raw_name = isset( $field_entry['name'] ) ? $field_entry['name'] : '';
+
+                        if ( is_array( $raw_name ) || ( ! is_string( $raw_name ) && ! is_numeric( $raw_name ) ) ) {
+                            continue;
+                        }
+
+                        $field_name = trim( preg_replace( '/\s+/', ' ', (string) $raw_name ) );
+
+                        if ( '' === $field_name ) {
+                            continue;
+                        }
+
+                        $map = array();
+
+                        if ( ! empty( $field_entry['map'] ) && is_array( $field_entry['map'] ) ) {
+                            foreach ( $field_entry['map'] as $map_key => $map_value ) {
+                                $raw_key = is_int( $map_key ) ? $map_value : $map_key;
+
+                                if ( is_array( $raw_key ) || ( ! is_string( $raw_key ) && ! is_numeric( $raw_key ) ) ) {
+                                    continue;
+                                }
+
+                                $clean_key = trim( preg_replace( '/\s+/', ' ', (string) $raw_key ) );
+
+                                if ( '' === $clean_key ) {
+                                    continue;
+                                }
+
+                                if ( is_array( $map_value ) ) {
+                                    continue;
+                                }
+
+                                $clean_value = ( is_string( $map_value ) || is_numeric( $map_value ) )
+                                    ? trim( preg_replace( '/\s+/', ' ', (string) $map_value ) )
+                                    : '';
+
+                                if ( '' === $clean_value ) {
+                                    $clean_value = $clean_key;
+                                }
+
+                                $map[ $this->to_lower( $clean_key ) ] = $clean_value;
+                            }
+                        }
+
+                        $field_specs[] = array(
+                            'name' => $field_name,
+                            'map'  => $map,
+                        );
+                    } elseif ( is_string( $field_entry ) || is_numeric( $field_entry ) ) {
+                        $field_name = trim( preg_replace( '/\s+/', ' ', (string) $field_entry ) );
+
+                        if ( '' === $field_name ) {
+                            continue;
+                        }
+
+                        $field_specs[] = array(
+                            'name' => $field_name,
+                            'map'  => array(),
+                        );
                     }
-                    break;
-                case 'color':
-                    if ( ! empty( $card['color'] ) ) {
-                        if ( is_array( $card['color'] ) ) {
-                            $values = $card['color'];
-                        } else {
-                            $values = array( $card['color'] );
+                }
+            } elseif ( isset( $config['field'] ) && ( is_string( $config['field'] ) || is_numeric( $config['field'] ) ) ) {
+                $field_name = trim( preg_replace( '/\s+/', ' ', (string) $config['field'] ) );
+
+                if ( '' !== $field_name ) {
+                    $field_specs[] = array(
+                        'name' => $field_name,
+                        'map'  => array(),
+                    );
+                }
+            }
+
+            foreach ( $field_specs as $field_spec ) {
+                $field_name = $field_spec['name'];
+
+                if ( '' === $field_name || ! array_key_exists( $field_name, $card ) ) {
+                    continue;
+                }
+
+                $raw_value = $card[ $field_name ];
+
+                if ( is_array( $raw_value ) ) {
+                    $candidates = $raw_value;
+                } elseif ( null !== $raw_value ) {
+                    $candidates = array( $raw_value );
+                } else {
+                    $candidates = array();
+                }
+
+                foreach ( $candidates as $candidate ) {
+                    if ( ! is_string( $candidate ) && ! is_numeric( $candidate ) ) {
+                        continue;
+                    }
+
+                    $clean = trim( preg_replace( '/\s+/', ' ', (string) $candidate ) );
+
+                    if ( '' === $clean ) {
+                        continue;
+                    }
+
+                    if ( ! empty( $field_spec['map'] ) ) {
+                        $lookup = $this->to_lower( $clean );
+
+                        if ( isset( $field_spec['map'][ $lookup ] ) ) {
+                            $values[] = $field_spec['map'][ $lookup ];
+                            continue;
                         }
                     }
-                    break;
-                case 'domain':
-                    if ( ! empty( $card['domain'] ) ) {
-                        $values = array( $card['domain'] );
-                    }
-                    break;
+
+                    $values[] = $clean;
+                }
             }
 
             $normalized = array();

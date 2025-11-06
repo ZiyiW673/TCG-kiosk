@@ -233,6 +233,11 @@ header {
     justify-content: center;
 }
 
+.tcg-kiosk__type-row--colors,
+.tcg-kiosk__type-row--types {
+    justify-content: center;
+}
+
 .tcg-kiosk__overlay {
     position: fixed;
     inset: 0;
