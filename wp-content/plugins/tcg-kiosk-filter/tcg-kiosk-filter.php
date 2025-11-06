@@ -238,6 +238,10 @@ header {
     justify-content: center;
 }
 
+.tcg-kiosk__type-row--colors {
+    gap: 0.65rem;
+}
+
 .tcg-kiosk__overlay {
     position: fixed;
     inset: 0;
@@ -535,6 +539,33 @@ header {
     color: #fff;
 }
 
+.tcg-kiosk__type-button--color-swatch {
+    padding: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    border: none;
+    background-color: var(--tcg-kiosk-swatch-color, #2271b1);
+    color: var(--tcg-kiosk-swatch-foreground, #fff);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.tcg-kiosk__type-button--color-swatch:hover,
+.tcg-kiosk__type-button--color-swatch:focus {
+    border: none;
+    box-shadow: 0 0 0 3px rgba(34, 113, 177, 0.35);
+    color: var(--tcg-kiosk-swatch-foreground, #fff);
+    outline: none;
+}
+
+.tcg-kiosk__type-button--color-swatch.is-active {
+    box-shadow: 0 0 0 3px #fff, 0 0 0 5px #2271b1;
+    background-color: var(--tcg-kiosk-swatch-color, #2271b1);
+    color: var(--tcg-kiosk-swatch-foreground, #fff);
+}
+
 .tcg-kiosk__filters label {
     display: flex;
     flex-direction: column;
@@ -806,6 +837,17 @@ CSS;
     'stadium',
     'supporter',
     'item',
+  ] );
+  const ONE_PIECE_COLOR_SWATCHES = new Map( [
+    [ 'red', '#d0051e' ],
+    [ 'green', '#13865f' ],
+    [ 'blue', '#1d76b8' ],
+    [ 'purple', '#8f4593' ],
+    [ 'black', '#5b605c' ],
+    [ 'yellow', '#ede256' ],
+  ] );
+  const ONE_PIECE_COLOR_FOREGROUND = new Map( [
+    [ 'yellow', '#1d2327' ],
   ] );
 
   if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
@@ -1349,7 +1391,7 @@ CSS;
     } );
   }
 
-  function createTypeButton( value, label ) {
+  function createTypeButton( value, label, rowKey ) {
     const button = document.createElement( 'button' );
     button.type = 'button';
     button.className = 'tcg-kiosk__type-button';
@@ -1359,8 +1401,32 @@ CSS;
 
     const iconUrl = getTypeIconUrl( label, value );
     const normalizedIconKey = normalizeTypeIconKey( value ) || normalizeTypeIconKey( label );
+    const normalizedRowKey = normalizeTypeIconKey( rowKey );
+    const isColorSwatch = normalizedRowKey === 'colors';
 
-    if ( iconUrl ) {
+    if ( isColorSwatch ) {
+      button.classList.add( 'tcg-kiosk__type-button--color-swatch' );
+      button.setAttribute( 'aria-label', label );
+
+      const normalizedValueKey = normalizedIconKey;
+      if ( normalizedValueKey ) {
+        const swatchColor = ONE_PIECE_COLOR_SWATCHES.get( normalizedValueKey );
+        const swatchForeground = ONE_PIECE_COLOR_FOREGROUND.get( normalizedValueKey );
+
+        if ( swatchColor ) {
+          button.style.setProperty( '--tcg-kiosk-swatch-color', swatchColor );
+        }
+
+        if ( swatchForeground ) {
+          button.style.setProperty( '--tcg-kiosk-swatch-foreground', swatchForeground );
+        }
+      }
+
+      const hiddenLabel = document.createElement( 'span' );
+      hiddenLabel.className = 'tcg-kiosk__type-button-text';
+      hiddenLabel.textContent = label;
+      button.appendChild( hiddenLabel );
+    } else if ( iconUrl ) {
       button.classList.add( 'tcg-kiosk__type-button--has-icon' );
 
       if ( normalizedIconKey && LARGE_TYPE_ICON_KEYS.has( normalizedIconKey ) ) {
@@ -1578,11 +1644,11 @@ CSS;
     }
 
     if ( includeAllOption ) {
-      appendToRow( createTypeButton( '', allLabel ) );
+      appendToRow( createTypeButton( '', allLabel, DEFAULT_ROW_KEY ), DEFAULT_ROW_KEY );
     }
 
     options.forEach( ( option ) => {
-      appendToRow( createTypeButton( option.value, option.label ), option.row );
+      appendToRow( createTypeButton( option.value, option.label, option.row ), option.row );
     } );
 
     updateActiveTypeButton();
