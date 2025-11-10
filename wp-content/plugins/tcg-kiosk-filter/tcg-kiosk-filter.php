@@ -356,9 +356,29 @@ header {
 }
 
 .tcg-kiosk__card-overlay-price {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: baseline;
     font-size: 1.25rem;
     font-weight: 700;
     color: #111;
+}
+
+.tcg-kiosk__card-overlay-price-label {
+    font-weight: 600;
+}
+
+.tcg-kiosk__card-overlay-price-amount {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: baseline;
+}
+
+.tcg-kiosk__card-overlay-price-stock {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #1d2327;
 }
 
 .tcg-kiosk__card-overlay-variant {
@@ -1313,28 +1333,93 @@ CSS;
     }
   }
 
+  function formatStockLabel( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return '';
+    }
+
+    const quantity = Number.parseInt( entry.stockQuantity, 10 );
+
+    if ( Number.isInteger( quantity ) ) {
+      const safeQuantity = quantity < 0 ? 0 : quantity;
+
+      if ( 1 === safeQuantity ) {
+        return '1 left';
+      }
+
+      return `${ safeQuantity } left`;
+    }
+
+    if ( false === entry.isInStock ) {
+      return i18n.outOfStock || 'Out of stock';
+    }
+
+    return '';
+  }
+
   function setPriceDisplay( entry ) {
     if ( ! cardOverlayPrice ) {
       return;
     }
 
-    let html = '';
+    cardOverlayPrice.innerHTML = '';
+    cardOverlayPrice.hidden = true;
 
-    if ( entry ) {
-      if ( entry.priceHtml ) {
-        html = entry.priceHtml;
-      } else if ( entry.price ) {
-        html = ( entry.currencySymbol || '' ) + String( entry.price );
-      }
+    if ( ! entry ) {
+      return;
     }
 
-    if ( html ) {
-      cardOverlayPrice.innerHTML = html;
-      cardOverlayPrice.hidden = false;
-    } else {
-      cardOverlayPrice.innerHTML = '';
-      cardOverlayPrice.hidden = true;
+    let priceHtml = '';
+
+    if ( entry.priceHtml ) {
+      priceHtml = entry.priceHtml;
+    } else if ( entry.price ) {
+      priceHtml = ( entry.currencySymbol || '' ) + String( entry.price );
     }
+
+    if ( ! priceHtml ) {
+      return;
+    }
+
+    const variantLabelCandidates = [];
+
+    if ( entry.attributeSummary ) {
+      variantLabelCandidates.push( entry.attributeSummary );
+    }
+
+    if ( entry.type === 'variation' && entry.name ) {
+      variantLabelCandidates.push( entry.name );
+    }
+
+    const variantLabel = variantLabelCandidates
+      .map( ( value ) => ( value && value.trim ? value.trim() : '' ) )
+      .find( ( value ) => value ) || '';
+
+    const stockLabel = formatStockLabel( entry );
+    const fragment = document.createDocumentFragment();
+
+    if ( variantLabel ) {
+      const labelSpan = document.createElement( 'span' );
+      labelSpan.className = 'tcg-kiosk__card-overlay-price-label';
+      const trimmedLabel = variantLabel.endsWith( ':' ) ? variantLabel : `${ variantLabel }:`;
+      labelSpan.textContent = trimmedLabel;
+      fragment.appendChild( labelSpan );
+    }
+
+    const amountSpan = document.createElement( 'span' );
+    amountSpan.className = 'tcg-kiosk__card-overlay-price-amount';
+    amountSpan.innerHTML = priceHtml;
+    fragment.appendChild( amountSpan );
+
+    if ( stockLabel ) {
+      const stockSpan = document.createElement( 'span' );
+      stockSpan.className = 'tcg-kiosk__card-overlay-price-stock';
+      stockSpan.textContent = stockLabel;
+      fragment.appendChild( stockSpan );
+    }
+
+    cardOverlayPrice.appendChild( fragment );
+    cardOverlayPrice.hidden = false;
   }
 
   function updateAddToCartButtonState( entry ) {
