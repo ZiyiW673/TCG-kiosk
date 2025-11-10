@@ -377,10 +377,18 @@ header {
     color: #1d2327;
 }
 
+.tcg-kiosk__card-overlay-selection {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+}
+
 .tcg-kiosk__card-overlay-variant {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+    flex: 1 1 260px;
 }
 
 .tcg-kiosk__card-overlay-variant-label {
@@ -399,6 +407,37 @@ header {
 }
 
 .tcg-kiosk__card-overlay-variant-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tcg-kiosk__card-overlay-quantity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 0 1 160px;
+}
+
+.tcg-kiosk__card-overlay-quantity-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #1d2327;
+    text-transform: uppercase;
+}
+
+.tcg-kiosk__card-overlay-quantity-input {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    background-color: #fff;
+    color: #1d2327;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.tcg-kiosk__card-overlay-quantity-input:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
@@ -946,6 +985,8 @@ CSS;
   const cardOverlayVariantContainer = document.getElementById( 'tcg-kiosk-card-overlay-variant' );
   const cardOverlayVariantLabel = document.getElementById( 'tcg-kiosk-card-overlay-variant-label' );
   const cardOverlayVariantSelect = document.getElementById( 'tcg-kiosk-card-overlay-variant-select' );
+  const cardOverlayQuantityContainer = document.getElementById( 'tcg-kiosk-card-overlay-quantity' );
+  const cardOverlayQuantityInput = document.getElementById( 'tcg-kiosk-card-overlay-quantity-input' );
   const cardOverlayAddToCart = document.getElementById( 'tcg-kiosk-card-overlay-add-to-cart' );
   const cardOverlayCommerceMessage = document.getElementById( 'tcg-kiosk-card-overlay-commerce-message' );
   const typeIconConfig = window.tcgKioskData.typeIcons || {};
@@ -981,6 +1022,7 @@ CSS;
   let currentCommerceCard = null;
   let currentCommerceEntries = [];
   let currentCommerceSelectionIndex = -1;
+  let currentQuantityValue = 1;
   let isAddingToCart = false;
   const ONE_PIECE_COLOR_FOREGROUND = new Map( [
     [ 'yellow', '#1d2327' ],
@@ -1202,6 +1244,7 @@ CSS;
     currentCommerceCard = null;
     currentCommerceEntries = [];
     currentCommerceSelectionIndex = -1;
+    currentQuantityValue = 1;
     isAddingToCart = false;
 
     if ( cardOverlayCommerce ) {
@@ -1225,6 +1268,16 @@ CSS;
 
     if ( cardOverlayVariantLabel && i18n.chooseVariant ) {
       cardOverlayVariantLabel.textContent = i18n.chooseVariant;
+    }
+
+    if ( cardOverlayQuantityContainer ) {
+      cardOverlayQuantityContainer.hidden = true;
+    }
+
+    if ( cardOverlayQuantityInput ) {
+      cardOverlayQuantityInput.value = '1';
+      cardOverlayQuantityInput.disabled = true;
+      cardOverlayQuantityInput.removeAttribute( 'max' );
     }
 
     if ( cardOverlayAddToCart ) {
@@ -1406,6 +1459,112 @@ CSS;
     return '';
   }
 
+  function getEntryAvailableStock( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return null;
+    }
+
+    const candidates = [
+      entry.stockQuantity,
+      entry.stock_quantity,
+      entry.stock,
+      entry.quantityAvailable,
+      entry.quantity_available,
+      entry.qty,
+      entry.maxPurchaseQuantity,
+      entry.max_purchase_quantity,
+      entry.max_qty,
+    ];
+
+    for ( const candidate of candidates ) {
+      const parsed = Number.parseInt( candidate, 10 );
+
+      if ( Number.isInteger( parsed ) ) {
+        return parsed < 0 ? 0 : parsed;
+      }
+    }
+
+    return null;
+  }
+
+  function clampQuantityForEntry( value, entry ) {
+    const min = 1;
+    let quantity = Number.parseInt( value, 10 );
+
+    if ( ! Number.isInteger( quantity ) || quantity < min ) {
+      quantity = min;
+    }
+
+    const stockLimit = getEntryAvailableStock( entry );
+
+    if ( 'number' === typeof stockLimit && stockLimit > 0 && quantity > stockLimit ) {
+      quantity = stockLimit;
+    }
+
+    return quantity;
+  }
+
+  function updateQuantityControl( entry, options ) {
+    if ( ! cardOverlayQuantityInput || ! cardOverlayQuantityContainer ) {
+      return;
+    }
+
+    const resetValue = !! ( options && options.resetValue );
+
+    if ( resetValue ) {
+      currentQuantityValue = 1;
+    }
+
+    if ( ! entry ) {
+      cardOverlayQuantityContainer.hidden = true;
+      cardOverlayQuantityInput.value = '1';
+      cardOverlayQuantityInput.disabled = true;
+      cardOverlayQuantityInput.removeAttribute( 'max' );
+      currentQuantityValue = 1;
+      return;
+    }
+
+    cardOverlayQuantityContainer.hidden = false;
+
+    const stockLimit = getEntryAvailableStock( entry );
+    let nextQuantity = resetValue ? 1 : clampQuantityForEntry( currentQuantityValue, entry );
+
+    if ( 'number' === typeof stockLimit && stockLimit > 0 ) {
+      cardOverlayQuantityInput.max = String( stockLimit );
+
+      if ( nextQuantity > stockLimit ) {
+        nextQuantity = stockLimit;
+      }
+    } else {
+      cardOverlayQuantityInput.removeAttribute( 'max' );
+    }
+
+    if ( nextQuantity < 1 ) {
+      nextQuantity = 1;
+    }
+
+    currentQuantityValue = nextQuantity;
+    cardOverlayQuantityInput.value = String( nextQuantity );
+    cardOverlayQuantityInput.disabled = ! isEntryPurchasable( entry );
+  }
+
+  function getSelectedQuantityValue() {
+    const entry = currentCommerceEntries[ currentCommerceSelectionIndex ] || null;
+
+    if ( ! entry ) {
+      return 1;
+    }
+
+    const quantity = clampQuantityForEntry( currentQuantityValue, entry );
+    currentQuantityValue = quantity;
+
+    if ( cardOverlayQuantityInput ) {
+      cardOverlayQuantityInput.value = String( quantity );
+    }
+
+    return quantity;
+  }
+
   function setPriceDisplay( entry ) {
     if ( ! cardOverlayPrice ) {
       return;
@@ -1486,6 +1645,7 @@ CSS;
       cardOverlayVariantSelect.value = String( nextIndex );
     }
 
+    updateQuantityControl( entry, { resetValue: true } );
     setPriceDisplay( entry );
     showCommerceMessage( '', '' );
 
@@ -1693,7 +1853,7 @@ CSS;
     return null;
   }
 
-  function buildAddToCartPayload( entry, options ) {
+  function buildAddToCartPayload( entry, options, quantityOverride ) {
     const params = new URLSearchParams();
 
     if ( ! entry ) {
@@ -1730,8 +1890,9 @@ CSS;
       params.set( 'add-to-cart', String( productId ) );
     }
 
-    const quantity = Number.parseInt( entry.quantity, 10 );
-    params.set( 'quantity', String( Number.isInteger( quantity ) && quantity > 0 ? quantity : 1 ) );
+    const quantity =
+      toPositiveInt( quantityOverride ) || toPositiveInt( entry.quantity ) || 1;
+    params.set( 'quantity', String( quantity ) );
 
     return params;
   }
@@ -1746,12 +1907,16 @@ CSS;
     if ( isAddingToCart ) {
       cardOverlayAddToCart.textContent = i18n.addingToCart || 'Adding…';
       cardOverlayAddToCart.disabled = true;
+      if ( cardOverlayQuantityInput ) {
+        cardOverlayQuantityInput.disabled = true;
+      }
       return;
     }
 
     const entry = currentCommerceEntries[ currentCommerceSelectionIndex ] || null;
     cardOverlayAddToCart.textContent = i18n.addToCart || 'Add to cart';
     cardOverlayAddToCart.disabled = ! isEntryPurchasable( entry );
+    updateQuantityControl( entry, { resetValue: false } );
   }
 
   function formatAddedMessage( entry ) {
@@ -1836,9 +2001,10 @@ CSS;
     showCommerceMessage( '', '' );
 
     const endpoint = getAddToCartEndpoint();
+    const quantity = getSelectedQuantityValue();
     const payload = buildAddToCartPayload( entry, {
       includeAddToCartParam: shouldIncludeAddToCartParam( endpoint ),
-    } );
+    }, quantity );
     let responseData = null;
 
     try {
@@ -2811,6 +2977,15 @@ CSS;
     } );
   }
 
+  if ( cardOverlayQuantityInput ) {
+    cardOverlayQuantityInput.addEventListener( 'input', () => {
+      const entry = currentCommerceEntries[ currentCommerceSelectionIndex ] || null;
+      const quantity = clampQuantityForEntry( cardOverlayQuantityInput.value, entry );
+      currentQuantityValue = quantity;
+      cardOverlayQuantityInput.value = String( quantity );
+    } );
+  }
+
   if ( cardOverlayAddToCart ) {
     cardOverlayAddToCart.addEventListener( 'click', ( event ) => {
       event.preventDefault();
@@ -2904,9 +3079,15 @@ JS;
                         <dl id="tcg-kiosk-detail-metadata" class="tcg-kiosk__card-overlay-details"></dl>
                         <div id="tcg-kiosk-card-overlay-commerce" class="tcg-kiosk__card-overlay-commerce" hidden>
                             <div id="tcg-kiosk-card-overlay-price" class="tcg-kiosk__card-overlay-price"></div>
-                            <div id="tcg-kiosk-card-overlay-variant" class="tcg-kiosk__card-overlay-variant" hidden>
-                                <label for="tcg-kiosk-card-overlay-variant-select" id="tcg-kiosk-card-overlay-variant-label" class="tcg-kiosk__card-overlay-variant-label"><?php esc_html_e( 'Choose a version', 'tcg-kiosk-filter' ); ?></label>
-                                <select id="tcg-kiosk-card-overlay-variant-select" class="tcg-kiosk__card-overlay-variant-select"></select>
+                            <div class="tcg-kiosk__card-overlay-selection">
+                                <div id="tcg-kiosk-card-overlay-variant" class="tcg-kiosk__card-overlay-variant" hidden>
+                                    <label for="tcg-kiosk-card-overlay-variant-select" id="tcg-kiosk-card-overlay-variant-label" class="tcg-kiosk__card-overlay-variant-label"><?php esc_html_e( 'Choose a version', 'tcg-kiosk-filter' ); ?></label>
+                                    <select id="tcg-kiosk-card-overlay-variant-select" class="tcg-kiosk__card-overlay-variant-select"></select>
+                                </div>
+                                <div id="tcg-kiosk-card-overlay-quantity" class="tcg-kiosk__card-overlay-quantity" hidden>
+                                    <label for="tcg-kiosk-card-overlay-quantity-input" class="tcg-kiosk__card-overlay-quantity-label"><?php esc_html_e( 'Amount', 'tcg-kiosk-filter' ); ?></label>
+                                    <input type="number" id="tcg-kiosk-card-overlay-quantity-input" class="tcg-kiosk__card-overlay-quantity-input" value="1" min="1" step="1" inputmode="numeric" pattern="[0-9]*" />
+                                </div>
                             </div>
                             <button type="button" id="tcg-kiosk-card-overlay-add-to-cart" class="tcg-kiosk__card-overlay-add-to-cart" disabled><?php esc_html_e( 'Add to cart', 'tcg-kiosk-filter' ); ?></button>
                             <p id="tcg-kiosk-card-overlay-commerce-message" class="tcg-kiosk__card-overlay-commerce-message" role="status" aria-live="polite" hidden></p>
