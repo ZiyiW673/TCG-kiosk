@@ -1537,18 +1537,44 @@ CSS;
 
     cardOverlayVariantButtons = [];
 
-    if ( entries.length > 1 && cardOverlayVariantContainer && cardOverlayVariantOptions ) {
-      let visibleButtonCount = 0;
+    if ( cardOverlayVariantContainer && cardOverlayVariantOptions ) {
       const labelText =
         ( cardOverlayVariantLabel && cardOverlayVariantLabel.textContent ) ||
         i18n.chooseVariant ||
         'Choose a version';
 
-      entries.forEach( ( entry, index ) => {
-        if ( ! isEntryPurchasable( entry ) ) {
-          return;
+      const purchasableEntries = entries
+        .map( ( entry, index ) => ( { entry, index } ) )
+        .filter( ( payload ) => {
+          if ( ! payload || ! payload.entry ) {
+            return false;
+          }
+
+          return isEntryPurchasable( payload.entry );
+        } );
+
+      const variationEntries = purchasableEntries.filter( ( payload ) => {
+        const { entry } = payload;
+
+        if ( ! entry ) {
+          return false;
         }
 
+        if ( 'variation' === entry.type ) {
+          return true;
+        }
+
+        if ( entry.variationId && Number.isFinite( Number( entry.variationId ) ) ) {
+          return Number( entry.variationId ) > 0;
+        }
+
+        return false;
+      } );
+
+      const buttonEntries = variationEntries.length > 0 ? variationEntries : purchasableEntries.length > 1 ? purchasableEntries : [];
+
+      buttonEntries.forEach( ( payload ) => {
+        const { entry, index } = payload;
         const button = document.createElement( 'button' );
         button.type = 'button';
         button.className = 'tcg-kiosk__card-overlay-variant-button';
@@ -1567,20 +1593,19 @@ CSS;
 
         cardOverlayVariantOptions.appendChild( button );
         cardOverlayVariantButtons.push( button );
-        visibleButtonCount++;
       } );
 
-      if ( cardOverlayVariantOptions ) {
+      if ( buttonEntries.length > 0 ) {
         if ( labelText ) {
           cardOverlayVariantOptions.setAttribute( 'aria-label', labelText );
         } else {
           cardOverlayVariantOptions.removeAttribute( 'aria-label' );
         }
+      } else {
+        cardOverlayVariantOptions.removeAttribute( 'aria-label' );
       }
 
-      cardOverlayVariantContainer.hidden = visibleButtonCount <= 0;
-    } else if ( cardOverlayVariantContainer ) {
-      cardOverlayVariantContainer.hidden = true;
+      cardOverlayVariantContainer.hidden = buttonEntries.length <= 0;
     }
 
     let defaultIndex = entries.findIndex( ( entry ) => isEntryPurchasable( entry ) );
