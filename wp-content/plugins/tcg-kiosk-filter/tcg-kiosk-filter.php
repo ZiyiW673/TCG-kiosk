@@ -1406,19 +1406,66 @@ CSS;
     }
   }
 
-  function buildAddToCartPayload( entry ) {
+  function shouldIncludeAddToCartParam( endpoint ) {
+    if ( ! endpoint ) {
+      return true;
+    }
+
+    try {
+      const url = new URL( endpoint, window.location.href );
+      const ajaxParam = url.searchParams.get( 'wc-ajax' ) || url.searchParams.get( 'wc_ajax' );
+      const actionParam = url.searchParams.get( 'action' );
+
+      if ( 'add_to_cart' === ajaxParam ) {
+        return false;
+      }
+
+      if ( 'woocommerce_add_to_cart' === actionParam ) {
+        return false;
+      }
+
+      const serialized = url.toString();
+
+      if ( serialized.includes( 'wc-ajax=add_to_cart' ) || serialized.includes( 'wc_ajax=add_to_cart' ) ) {
+        return false;
+      }
+
+      if ( serialized.includes( 'action=woocommerce_add_to_cart' ) ) {
+        return false;
+      }
+    } catch ( error ) {
+      const normalized = String( endpoint );
+
+      if ( normalized.includes( 'wc-ajax=add_to_cart' ) || normalized.includes( 'wc_ajax=add_to_cart' ) ) {
+        return false;
+      }
+
+      if ( normalized.includes( 'action=woocommerce_add_to_cart' ) ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function buildAddToCartPayload( entry, options ) {
     const params = new URLSearchParams();
+    const includeAddToCartParam = options && options.includeAddToCartParam;
 
     if ( ! entry ) {
       return params;
     }
 
-    const productId = entry.parentId || entry.productId || entry.variationId;
+    const productId = entry.productId || entry.parentId || entry.variationId;
 
     if ( productId ) {
       const idValue = String( productId );
 
       params.set( 'product_id', idValue );
+
+      if ( includeAddToCartParam ) {
+        params.set( 'add-to-cart', idValue );
+      }
     }
 
     if ( entry.variationId ) {
@@ -1584,7 +1631,9 @@ CSS;
     showCommerceMessage( '', '' );
 
     const endpoint = getAddToCartEndpoint();
-    const payload = buildAddToCartPayload( entry );
+    const payload = buildAddToCartPayload( entry, {
+      includeAddToCartParam: shouldIncludeAddToCartParam( endpoint ),
+    } );
     let responseData = null;
 
     try {
