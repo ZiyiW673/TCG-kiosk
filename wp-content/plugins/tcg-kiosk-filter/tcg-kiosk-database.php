@@ -161,7 +161,9 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         continue;
                     }
 
-                    if ( ! $this->should_include_card( $card, $type_slug ) ) {
+                    $product_matches = $this->get_card_product_matches( $card, $type_slug );
+
+                    if ( ! $this->should_include_card( $card, $type_slug, $product_matches ) ) {
                         continue;
                     }
 
@@ -182,6 +184,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         'imageSizes'   => $image_sources['sizes'],
                         'typeValues'   => $this->extract_type_values( $card, $config ),
                         'details'      => $this->prepare_card_details( $card, $set_name, $game, $type_slug ),
+                        'products'     => is_array( $product_matches ) ? array_values( $product_matches ) : array(),
                     );
                 }
             }
@@ -197,7 +200,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          *
          * @return bool
          */
-        protected function should_include_card( array $card, $type_slug ) {
+        protected function should_include_card( array $card, $type_slug, $matches = null ) {
             $lookup = $this->get_product_card_lookup();
 
             if ( null === $lookup ) {
@@ -205,26 +208,90 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             }
 
             if ( empty( $lookup ) ) {
-                return apply_filters( 'tcg_kiosk_should_include_card', false, $card, $type_slug, $lookup );
+                return apply_filters( 'tcg_kiosk_should_include_card', false, $card, $type_slug, $lookup, array() );
             }
 
-            $include   = false;
+            if ( null === $matches ) {
+                $matches = $this->get_card_product_matches( $card, $type_slug );
+            }
+
+            if ( ! is_array( $matches ) ) {
+                $matches = array();
+            }
+
+            $include = ! empty( $matches );
+
+            return apply_filters( 'tcg_kiosk_should_include_card', $include, $card, $type_slug, $lookup, $matches );
+        }
+
+        /**
+         * Retrieve the WooCommerce product matches for a given card.
+         *
+         * @param array  $card      Raw card payload.
+         * @param string $type_slug Current game slug.
+         *
+         * @return array|null
+         */
+        protected function get_card_product_matches( array $card, $type_slug ) {
+            $lookup = $this->get_product_card_lookup();
+
+            if ( null === $lookup ) {
+                return null;
+            }
+
+            if ( empty( $lookup ) ) {
+                return array();
+            }
+
             $candidates = $this->get_card_identifier_candidates( $card, $type_slug );
+
+            if ( empty( $candidates ) ) {
+                return array();
+            }
+
+            $matches = array();
+            $seen    = array();
 
             foreach ( $candidates as $candidate ) {
                 $normalized = $this->normalize_card_identifier( $candidate );
 
-                if ( '' === $normalized ) {
+                if ( '' === $normalized || ! isset( $lookup[ $normalized ] ) || empty( $lookup[ $normalized ] ) ) {
                     continue;
                 }
 
-                if ( isset( $lookup[ $normalized ] ) ) {
-                    $include = true;
-                    break;
+                foreach ( $lookup[ $normalized ] as $entry ) {
+                    if ( empty( $entry ) || ! is_array( $entry ) ) {
+                        continue;
+                    }
+
+                    $product_id   = isset( $entry['productId'] ) ? (int) $entry['productId'] : 0;
+                    $variation_id = isset( $entry['variationId'] ) ? (int) $entry['variationId'] : 0;
+                    $unique_key   = $product_id . '|' . $variation_id;
+
+                    if ( isset( $seen[ $unique_key ] ) ) {
+                        $index = $seen[ $unique_key ];
+
+                        if ( isset( $matches[ $index ]['matchedIdentifiers'] ) && is_array( $matches[ $index ]['matchedIdentifiers'] ) ) {
+                            $matches[ $index ]['matchedIdentifiers'][] = $candidate;
+                            $matches[ $index ]['matchedIdentifiers']   = array_values( array_unique( array_filter( $matches[ $index ]['matchedIdentifiers'] ) ) );
+                        }
+
+                        continue;
+                    }
+
+                    $entry['matchedIdentifiers'] = isset( $entry['matchedIdentifiers'] ) && is_array( $entry['matchedIdentifiers'] )
+                        ? array_values( array_unique( array_filter( $entry['matchedIdentifiers'] ) ) )
+                        : array();
+
+                    $entry['matchedIdentifiers'][] = $candidate;
+                    $entry['matchedIdentifiers']   = array_values( array_unique( array_filter( $entry['matchedIdentifiers'] ) ) );
+
+                    $matches[]           = $entry;
+                    $seen[ $unique_key ] = count( $matches ) - 1;
                 }
             }
 
-            return apply_filters( 'tcg_kiosk_should_include_card', $include, $card, $type_slug, $lookup );
+            return apply_filters( 'tcg_kiosk_card_product_matches', $matches, $card, $type_slug, $lookup, $candidates );
         }
 
         /**
@@ -269,27 +336,86 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 return array();
             }
 
-            $identifiers = array();
+            $records = array();
 
             foreach ( $product_ids as $product_id ) {
-                $identifiers = array_merge( $identifiers, $this->extract_identifiers_from_product( $product_id ) );
+                $product_records = $this->extract_identifiers_from_product( $product_id );
+
+                if ( empty( $product_records ) ) {
+                    continue;
+                }
+
+                $records = array_merge( $records, $product_records );
             }
 
-            $identifiers = apply_filters( 'tcg_kiosk_product_card_identifiers', $identifiers, $product_ids );
+            if ( empty( $records ) ) {
+                return array();
+            }
+
+            $identifiers = array();
+
+            foreach ( $records as $record ) {
+                if ( isset( $record['identifier'] ) ) {
+                    $identifiers[] = $record['identifier'];
+                }
+            }
+
+            $identifiers = apply_filters( 'tcg_kiosk_product_card_identifiers', $identifiers, $product_ids, $records );
 
             $lookup = array();
+            $seen   = array();
 
-            foreach ( $identifiers as $identifier ) {
-                $normalized = $this->normalize_card_identifier( $identifier );
+            foreach ( $records as $record ) {
+                if ( empty( $record['identifier'] ) || empty( $record['data'] ) || ! is_array( $record['data'] ) ) {
+                    continue;
+                }
+
+                $normalized = $this->normalize_card_identifier( $record['identifier'] );
 
                 if ( '' === $normalized ) {
                     continue;
                 }
 
-                $lookup[ $normalized ] = true;
+                $product_id   = isset( $record['data']['productId'] ) ? (int) $record['data']['productId'] : ( isset( $record['product_id'] ) ? (int) $record['product_id'] : 0 );
+                $variation_id = isset( $record['data']['variationId'] ) ? (int) $record['data']['variationId'] : ( isset( $record['variation_id'] ) ? (int) $record['variation_id'] : 0 );
+
+                if ( ! isset( $record['data']['productId'] ) ) {
+                    $record['data']['productId'] = $product_id;
+                }
+
+                if ( ! isset( $record['data']['variationId'] ) ) {
+                    $record['data']['variationId'] = $variation_id;
+                }
+
+                if ( ! $product_id ) {
+                    continue;
+                }
+
+                if ( ! isset( $lookup[ $normalized ] ) ) {
+                    $lookup[ $normalized ] = array();
+                    $seen[ $normalized ]   = array();
+                }
+
+                $unique_key = $product_id . '|' . $variation_id;
+
+                if ( isset( $seen[ $normalized ][ $unique_key ] ) ) {
+                    $index = $seen[ $normalized ][ $unique_key ];
+
+                    if ( isset( $lookup[ $normalized ][ $index ]['matchedIdentifiers'] ) && is_array( $lookup[ $normalized ][ $index ]['matchedIdentifiers'] ) ) {
+                        $lookup[ $normalized ][ $index ]['matchedIdentifiers'][] = $record['identifier'];
+                        $lookup[ $normalized ][ $index ]['matchedIdentifiers']   = array_values( array_unique( array_filter( $lookup[ $normalized ][ $index ]['matchedIdentifiers'] ) ) );
+                    }
+
+                    continue;
+                }
+
+                $record['data']['matchedIdentifiers'] = array( $record['identifier'] );
+
+                $lookup[ $normalized ][]             = $record['data'];
+                $seen[ $normalized ][ $unique_key ] = count( $lookup[ $normalized ] ) - 1;
             }
 
-            return apply_filters( 'tcg_kiosk_product_card_lookup', $lookup, $identifiers, $product_ids );
+            return apply_filters( 'tcg_kiosk_product_card_lookup', $lookup, $identifiers, $product_ids, $records );
         }
 
         /**
@@ -300,7 +426,8 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          * @return array
          */
         protected function extract_identifiers_from_product( $product_id ) {
-            $identifiers = array();
+            $records     = array();
+            $identifiers = array( $product_id );
             $meta_keys   = apply_filters(
                 'tcg_kiosk_product_card_meta_keys',
                 array(
@@ -322,25 +449,42 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 $identifiers = array_merge( $identifiers, $this->extract_identifier_values( $value ) );
             }
 
-            if ( function_exists( 'wc_get_product' ) ) {
-                $product = wc_get_product( $product_id );
+            $product = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : null;
 
-                if ( $product ) {
-                    $sku = $product->get_sku();
+            if ( $product ) {
+                $sku = $product->get_sku();
 
-                    if ( $sku ) {
-                        $identifiers[] = $sku;
-                    }
+                if ( $sku ) {
+                    $identifiers[] = $sku;
+                }
 
-                    if ( $product->is_type( 'variable' ) ) {
-                        foreach ( $product->get_children() as $variation_id ) {
-                            $identifiers = array_merge( $identifiers, $this->extract_identifiers_from_variation( $variation_id ) );
-                        }
+                $payload = $this->format_product_payload( $product );
+            } else {
+                $payload = $this->format_basic_product_payload( $product_id );
+            }
+
+            $identifiers = array_values( array_unique( array_filter( array_map( array( $this, 'sanitize_identifier_value' ), $identifiers ) ) ) );
+
+            foreach ( $identifiers as $identifier ) {
+                $records[] = array(
+                    'identifier'   => $identifier,
+                    'product_id'   => (int) $product_id,
+                    'variation_id' => 0,
+                    'data'         => $payload,
+                );
+            }
+
+            if ( $product && $product->is_type( 'variable' ) ) {
+                foreach ( $product->get_children() as $variation_id ) {
+                    $variation_records = $this->extract_identifiers_from_variation( $variation_id, $product );
+
+                    if ( ! empty( $variation_records ) ) {
+                        $records = array_merge( $records, $variation_records );
                     }
                 }
             }
 
-            return $identifiers;
+            return $records;
         }
 
         /**
@@ -350,8 +494,9 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          *
          * @return array
          */
-        protected function extract_identifiers_from_variation( $variation_id ) {
-            $identifiers = array();
+        protected function extract_identifiers_from_variation( $variation_id, $parent_product = null ) {
+            $records     = array();
+            $identifiers = array( $variation_id );
             $meta_keys   = apply_filters(
                 'tcg_kiosk_variation_card_meta_keys',
                 array(
@@ -373,19 +518,34 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 $identifiers = array_merge( $identifiers, $this->extract_identifier_values( $value ) );
             }
 
-            if ( function_exists( 'wc_get_product' ) ) {
-                $variation = wc_get_product( $variation_id );
+            $variation = function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ) : null;
 
-                if ( $variation ) {
-                    $sku = $variation->get_sku();
+            if ( $variation ) {
+                $sku = $variation->get_sku();
 
-                    if ( $sku ) {
-                        $identifiers[] = $sku;
-                    }
+                if ( $sku ) {
+                    $identifiers[] = $sku;
                 }
+
+                $payload = $this->format_variation_payload( $variation, $parent_product );
+            } else {
+                $payload = $this->format_basic_variation_payload( $variation_id, $parent_product );
             }
 
-            return $identifiers;
+            $identifiers = array_values( array_unique( array_filter( array_map( array( $this, 'sanitize_identifier_value' ), $identifiers ) ) ) );
+
+            $product_id = isset( $payload['productId'] ) ? (int) $payload['productId'] : ( $parent_product ? (int) $parent_product->get_id() : 0 );
+
+            foreach ( $identifiers as $identifier ) {
+                $records[] = array(
+                    'identifier'   => $identifier,
+                    'product_id'   => $product_id,
+                    'variation_id' => (int) $variation_id,
+                    'data'         => $payload,
+                );
+            }
+
+            return $records;
         }
 
         /**
@@ -439,6 +599,314 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             }
 
             return $results;
+        }
+
+        /**
+         * Prepare a product payload for the front-end consumer.
+         *
+         * @param WC_Product $product Product instance.
+         *
+         * @return array
+         */
+        protected function format_product_payload( $product ) {
+            $product_id = $product ? (int) $product->get_id() : 0;
+
+            return array(
+                'productId'        => $product_id,
+                'variationId'      => 0,
+                'parentId'         => $product_id,
+                'type'             => $this->sanitize_text_value( $product ? $product->get_type() : 'simple' ),
+                'name'             => $this->sanitize_text_value( $product ? $product->get_name() : '' ),
+                'sku'              => $this->sanitize_text_value( $product ? $product->get_sku() : '' ),
+                'priceHtml'        => $this->prepare_price_html( $product ? $product->get_price_html() : '' ),
+                'price'            => $this->prepare_price_value( $product ? $product->get_price() : '' ),
+                'regularPrice'     => $this->prepare_price_value( $product ? $product->get_regular_price() : '' ),
+                'salePrice'        => $this->prepare_price_value( $product ? $product->get_sale_price() : '' ),
+                'currencySymbol'   => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '',
+                'isPurchasable'    => $product ? (bool) $product->is_purchasable() : false,
+                'isInStock'        => $product ? (bool) $product->is_in_stock() : false,
+                'stockStatus'      => $this->sanitize_text_value( $product ? $product->get_stock_status() : '' ),
+                'stockQuantity'    => $product && null !== $product->get_stock_quantity() ? (int) $product->get_stock_quantity() : null,
+                'backordersAllowed'=> $product ? (bool) $product->backorders_allowed() : false,
+                'permalink'        => $this->sanitize_url_value( $product ? $product->get_permalink() : '' ),
+                'attributes'       => array(),
+                'attributeSummary' => '',
+            );
+        }
+
+        /**
+         * Prepare a fallback payload when a product instance is unavailable.
+         *
+         * @param int $product_id Product ID.
+         *
+         * @return array
+         */
+        protected function format_basic_product_payload( $product_id ) {
+            $name      = function_exists( 'get_the_title' ) ? get_the_title( $product_id ) : '';
+            $permalink = function_exists( 'get_permalink' ) ? get_permalink( $product_id ) : '';
+
+            return array(
+                'productId'        => (int) $product_id,
+                'variationId'      => 0,
+                'parentId'         => (int) $product_id,
+                'type'             => 'simple',
+                'name'             => $this->sanitize_text_value( $name ),
+                'sku'              => '',
+                'priceHtml'        => '',
+                'price'            => '',
+                'regularPrice'     => '',
+                'salePrice'        => '',
+                'currencySymbol'   => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '',
+                'isPurchasable'    => false,
+                'isInStock'        => false,
+                'stockStatus'      => '',
+                'stockQuantity'    => null,
+                'backordersAllowed'=> false,
+                'permalink'        => $this->sanitize_url_value( $permalink ),
+                'attributes'       => array(),
+                'attributeSummary' => '',
+            );
+        }
+
+        /**
+         * Prepare a variation payload for the front-end consumer.
+         *
+         * @param WC_Product_Variation $variation      Variation instance.
+         * @param WC_Product           $parent_product Parent product instance.
+         *
+         * @return array
+         */
+        protected function format_variation_payload( $variation, $parent_product = null ) {
+            $parent_id         = $variation ? (int) $variation->get_parent_id() : ( $parent_product ? (int) $parent_product->get_id() : 0 );
+            $attribute_summary = '';
+
+            if ( $variation ) {
+                if ( method_exists( $variation, 'get_attribute_summary' ) ) {
+                    $attribute_summary = $this->sanitize_text_value( $variation->get_attribute_summary() );
+                }
+
+                if ( '' === $attribute_summary && function_exists( 'wc_get_formatted_variation' ) ) {
+                    $formatted = wc_get_formatted_variation( $variation, true );
+
+                    if ( is_array( $formatted ) ) {
+                        $formatted = implode( ', ', $formatted );
+                    }
+
+                    if ( is_string( $formatted ) ) {
+                        $attribute_summary = $this->sanitize_text_value( $formatted );
+                    }
+                }
+            }
+
+            return array(
+                'productId'        => $parent_id,
+                'variationId'      => $variation ? (int) $variation->get_id() : 0,
+                'parentId'         => $parent_id,
+                'type'             => 'variation',
+                'name'             => $this->sanitize_text_value( $variation ? $variation->get_name() : '' ),
+                'sku'              => $this->sanitize_text_value( $variation ? $variation->get_sku() : '' ),
+                'priceHtml'        => $this->prepare_price_html( $variation ? $variation->get_price_html() : '' ),
+                'price'            => $this->prepare_price_value( $variation ? $variation->get_price() : '' ),
+                'regularPrice'     => $this->prepare_price_value( $variation ? $variation->get_regular_price() : '' ),
+                'salePrice'        => $this->prepare_price_value( $variation ? $variation->get_sale_price() : '' ),
+                'currencySymbol'   => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '',
+                'isPurchasable'    => $variation ? (bool) $variation->is_purchasable() : false,
+                'isInStock'        => $variation ? (bool) $variation->is_in_stock() : false,
+                'stockStatus'      => $this->sanitize_text_value( $variation ? $variation->get_stock_status() : '' ),
+                'stockQuantity'    => $variation && null !== $variation->get_stock_quantity() ? (int) $variation->get_stock_quantity() : null,
+                'backordersAllowed'=> $variation ? (bool) $variation->backorders_allowed() : false,
+                'permalink'        => $this->sanitize_url_value(
+                    $variation ? $variation->get_permalink() : ( $parent_product ? $parent_product->get_permalink() : '' )
+                ),
+                'attributes'       => $variation ? $this->prepare_variation_attributes( $variation->get_attributes() ) : array(),
+                'attributeSummary' => $attribute_summary,
+            );
+        }
+
+        /**
+         * Prepare a fallback payload when a variation instance is unavailable.
+         *
+         * @param int        $variation_id   Variation ID.
+         * @param WC_Product $parent_product Optional parent product instance.
+         *
+         * @return array
+         */
+        protected function format_basic_variation_payload( $variation_id, $parent_product = null ) {
+            $parent_id = $parent_product ? (int) $parent_product->get_id() : 0;
+
+            return array(
+                'productId'        => $parent_id,
+                'variationId'      => (int) $variation_id,
+                'parentId'         => $parent_id,
+                'type'             => 'variation',
+                'name'             => '',
+                'sku'              => '',
+                'priceHtml'        => '',
+                'price'            => '',
+                'regularPrice'     => '',
+                'salePrice'        => '',
+                'currencySymbol'   => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '',
+                'isPurchasable'    => false,
+                'isInStock'        => false,
+                'stockStatus'      => '',
+                'stockQuantity'    => null,
+                'backordersAllowed'=> false,
+                'permalink'        => $this->sanitize_url_value( $parent_product ? $parent_product->get_permalink() : '' ),
+                'attributes'       => array(),
+                'attributeSummary' => '',
+            );
+        }
+
+        /**
+         * Sanitise the HTML string returned by WooCommerce pricing helpers.
+         *
+         * @param string $price_html Raw price HTML.
+         *
+         * @return string
+         */
+        protected function prepare_price_html( $price_html ) {
+            if ( empty( $price_html ) || ! is_string( $price_html ) ) {
+                return '';
+            }
+
+            if ( function_exists( 'wp_kses_post' ) ) {
+                return wp_kses_post( $price_html );
+            }
+
+            return $price_html;
+        }
+
+        /**
+         * Normalise a numeric price value for JSON transport.
+         *
+         * @param mixed $price Raw price value.
+         *
+         * @return string
+         */
+        protected function prepare_price_value( $price ) {
+            if ( null === $price || '' === $price ) {
+                return '';
+            }
+
+            if ( is_numeric( $price ) ) {
+                if ( function_exists( 'wc_format_decimal' ) ) {
+                    return wc_format_decimal( $price );
+                }
+
+                return (string) ( $price + 0 );
+            }
+
+            return trim( (string) $price );
+        }
+
+        /**
+         * Prepare variation attributes for JSON transport.
+         *
+         * @param array $attributes Raw variation attributes.
+         *
+         * @return array
+         */
+        protected function prepare_variation_attributes( $attributes ) {
+            if ( empty( $attributes ) || ! is_array( $attributes ) ) {
+                return array();
+            }
+
+            $prepared = array();
+
+            foreach ( $attributes as $key => $value ) {
+                if ( ! is_string( $key ) && ! is_numeric( $key ) ) {
+                    continue;
+                }
+
+                $attribute_key = trim( (string) $key );
+
+                if ( '' === $attribute_key ) {
+                    continue;
+                }
+
+                if ( is_array( $value ) ) {
+                    $value = reset( $value );
+                }
+
+                $attribute_value = is_scalar( $value ) ? (string) $value : '';
+
+                if ( function_exists( 'wc_clean' ) ) {
+                    $attribute_value = wc_clean( $attribute_value );
+                } elseif ( function_exists( 'sanitize_text_field' ) ) {
+                    $attribute_value = sanitize_text_field( $attribute_value );
+                } else {
+                    $attribute_value = $this->sanitize_text_value( $attribute_value );
+                }
+
+                $prepared[ $attribute_key ] = $attribute_value;
+            }
+
+            return $prepared;
+        }
+
+        /**
+         * Sanitise a text value for inclusion in the JSON payload.
+         *
+         * @param mixed $value Raw value.
+         *
+         * @return string
+         */
+        protected function sanitize_text_value( $value ) {
+            if ( null === $value ) {
+                return '';
+            }
+
+            $string = (string) $value;
+
+            if ( function_exists( 'wp_strip_all_tags' ) ) {
+                $string = wp_strip_all_tags( $string );
+            } else {
+                $string = strip_tags( $string );
+            }
+
+            return trim( $string );
+        }
+
+        /**
+         * Sanitise an identifier value before lookup storage.
+         *
+         * @param mixed $value Raw identifier value.
+         *
+         * @return string
+         */
+        protected function sanitize_identifier_value( $value ) {
+            if ( is_numeric( $value ) || is_string( $value ) ) {
+                $string = trim( (string) $value );
+
+                if ( '' === $string ) {
+                    return '';
+                }
+
+                return $string;
+            }
+
+            return '';
+        }
+
+        /**
+         * Sanitise a URL value for inclusion in the payload.
+         *
+         * @param string $url Raw URL.
+         *
+         * @return string
+         */
+        protected function sanitize_url_value( $url ) {
+            if ( empty( $url ) ) {
+                return '';
+            }
+
+            $string = (string) $url;
+
+            if ( function_exists( 'esc_url_raw' ) ) {
+                return esc_url_raw( $string );
+            }
+
+            return $string;
         }
 
         /**

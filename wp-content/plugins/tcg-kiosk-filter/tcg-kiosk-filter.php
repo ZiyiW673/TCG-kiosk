@@ -155,6 +155,15 @@ class TCG_Kiosk_Filter_Plugin {
                     'setLabel' => __( 'Set', 'tcg-kiosk-filter' ),
                     'idLabel' => __( 'Card ID', 'tcg-kiosk-filter' ),
                     'typeLabel' => __( 'Type', 'tcg-kiosk-filter' ),
+                    'addToCart' => __( 'Add to cart', 'tcg-kiosk-filter' ),
+                    'addingToCart' => __( 'Adding…', 'tcg-kiosk-filter' ),
+                    'addedToCart' => __( '%s was added to your cart.', 'tcg-kiosk-filter' ),
+                    'addToCartError' => __( 'Unable to add this item to your cart.', 'tcg-kiosk-filter' ),
+                    'selectProductOption' => __( 'Select a product option', 'tcg-kiosk-filter' ),
+                    'productOptionLabel' => __( 'Option %s', 'tcg-kiosk-filter' ),
+                    'outOfStock' => __( 'Out of stock', 'tcg-kiosk-filter' ),
+                    'notPurchasable' => __( 'This product cannot be purchased right now.', 'tcg-kiosk-filter' ),
+                    'chooseVariant' => __( 'Choose a version', 'tcg-kiosk-filter' ),
                 ),
             )
         );
@@ -337,6 +346,89 @@ header {
     margin: 0;
     color: #1d2327;
     white-space: pre-line;
+}
+
+.tcg-kiosk__card-overlay-commerce {
+    margin-top: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.tcg-kiosk__card-overlay-price {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111;
+}
+
+.tcg-kiosk__card-overlay-variant {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.tcg-kiosk__card-overlay-variant-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.tcg-kiosk__card-overlay-variant-select {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    background-color: #fff;
+    color: #1d2327;
+}
+
+.tcg-kiosk__card-overlay-variant-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tcg-kiosk__card-overlay-add-to-cart {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: 4px;
+    background-color: #2271b1;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+
+.tcg-kiosk__card-overlay-add-to-cart:hover:not(:disabled),
+.tcg-kiosk__card-overlay-add-to-cart:focus-visible:not(:disabled) {
+    background-color: #135e96;
+}
+
+.tcg-kiosk__card-overlay-add-to-cart:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tcg-kiosk__card-overlay-commerce-message {
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.tcg-kiosk__card-overlay-commerce-message[hidden] {
+    display: none;
+}
+
+.tcg-kiosk__card-overlay-commerce-message[data-status="error"] {
+    color: #b81c23;
+}
+
+.tcg-kiosk__card-overlay-commerce-message[data-status="success"] {
+    color: #0f834d;
 }
 
 .tcg-kiosk__card-overlay-empty {
@@ -816,6 +908,13 @@ CSS;
   const cardOverlayTitle = document.getElementById( 'tcg-kiosk-detail-title' );
   const cardOverlayDetails = document.getElementById( 'tcg-kiosk-detail-metadata' );
   const cardOverlayClose = document.getElementById( 'tcg-kiosk-detail-close' );
+  const cardOverlayCommerce = document.getElementById( 'tcg-kiosk-card-overlay-commerce' );
+  const cardOverlayPrice = document.getElementById( 'tcg-kiosk-card-overlay-price' );
+  const cardOverlayVariantContainer = document.getElementById( 'tcg-kiosk-card-overlay-variant' );
+  const cardOverlayVariantLabel = document.getElementById( 'tcg-kiosk-card-overlay-variant-label' );
+  const cardOverlayVariantSelect = document.getElementById( 'tcg-kiosk-card-overlay-variant-select' );
+  const cardOverlayAddToCart = document.getElementById( 'tcg-kiosk-card-overlay-add-to-cart' );
+  const cardOverlayCommerceMessage = document.getElementById( 'tcg-kiosk-card-overlay-commerce-message' );
   const typeIconConfig = window.tcgKioskData.typeIcons || {};
   const typeIconBaseUrl = 'string' === typeof typeIconConfig.baseUrl ? typeIconConfig.baseUrl : '';
   const typeIconMap = typeIconConfig.map && 'object' === typeof typeIconConfig.map ? typeIconConfig.map : {};
@@ -846,6 +945,10 @@ CSS;
     [ 'black', '#5b605c' ],
     [ 'yellow', '#ede256' ],
   ] );
+  let currentCommerceCard = null;
+  let currentCommerceEntries = [];
+  let currentCommerceSelectionIndex = -1;
+  let isAddingToCart = false;
   const ONE_PIECE_COLOR_FOREGROUND = new Map( [
     [ 'yellow', '#1d2327' ],
   ] );
@@ -954,6 +1057,8 @@ CSS;
     const trigger = lastFocusedCard;
     const shouldRestoreFocus = ! options || options.restoreFocus !== false;
 
+    resetCommerceSection();
+
     if ( trigger && typeof trigger.setAttribute === 'function' ) {
       trigger.setAttribute( 'aria-expanded', 'false' );
     }
@@ -1060,6 +1165,429 @@ CSS;
     return entries;
   }
 
+  function resetCommerceSection() {
+    currentCommerceCard = null;
+    currentCommerceEntries = [];
+    currentCommerceSelectionIndex = -1;
+    isAddingToCart = false;
+
+    if ( cardOverlayCommerce ) {
+      cardOverlayCommerce.hidden = true;
+    }
+
+    if ( cardOverlayPrice ) {
+      cardOverlayPrice.innerHTML = '';
+      cardOverlayPrice.hidden = true;
+    }
+
+    if ( cardOverlayVariantContainer ) {
+      cardOverlayVariantContainer.hidden = true;
+    }
+
+    if ( cardOverlayVariantSelect ) {
+      cardOverlayVariantSelect.innerHTML = '';
+      cardOverlayVariantSelect.disabled = true;
+      cardOverlayVariantSelect.value = '';
+    }
+
+    if ( cardOverlayVariantLabel && i18n.chooseVariant ) {
+      cardOverlayVariantLabel.textContent = i18n.chooseVariant;
+    }
+
+    if ( cardOverlayAddToCart ) {
+      cardOverlayAddToCart.disabled = true;
+      cardOverlayAddToCart.textContent = i18n.addToCart || 'Add to cart';
+    }
+
+    if ( cardOverlayCommerceMessage ) {
+      cardOverlayCommerceMessage.textContent = '';
+      cardOverlayCommerceMessage.hidden = true;
+      if ( cardOverlayCommerceMessage.dataset ) {
+        delete cardOverlayCommerceMessage.dataset.status;
+      }
+    }
+  }
+
+  function getEntryDisplayName( entry ) {
+    if ( entry ) {
+      if ( entry.attributeSummary ) {
+        return entry.attributeSummary;
+      }
+
+      if ( entry.name ) {
+        return entry.name;
+      }
+    }
+
+    if ( currentCommerceCard && currentCommerceCard.name ) {
+      return currentCommerceCard.name;
+    }
+
+    return '';
+  }
+
+  function getEntryOptionLabel( entry, index ) {
+    const candidates = [];
+
+    if ( entry ) {
+      if ( entry.attributeSummary ) {
+        candidates.push( entry.attributeSummary );
+      }
+
+      if ( entry.name ) {
+        candidates.push( entry.name );
+      }
+
+      if ( Array.isArray( entry.matchedIdentifiers ) && entry.matchedIdentifiers.length ) {
+        candidates.push( entry.matchedIdentifiers.join( ', ' ) );
+      }
+    }
+
+    const label = candidates.find( ( value ) => value && value.trim && value.trim() ) || '';
+
+    if ( label ) {
+      return label;
+    }
+
+    if ( i18n.productOptionLabel && i18n.productOptionLabel.includes( '%s' ) ) {
+      return i18n.productOptionLabel.replace( '%s', String( index + 1 ) );
+    }
+
+    return 'Option ' + String( index + 1 );
+  }
+
+  function isEntryPurchasable( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return false;
+    }
+
+    const purchasable = !! entry.isPurchasable;
+    const inStock = !! entry.isInStock;
+    const backordersAllowed = !! entry.backordersAllowed;
+
+    return purchasable && ( inStock || backordersAllowed );
+  }
+
+  function showCommerceMessage( message, status ) {
+    if ( ! cardOverlayCommerceMessage ) {
+      return;
+    }
+
+    const text = message ? String( message ) : '';
+
+    if ( ! text ) {
+      cardOverlayCommerceMessage.textContent = '';
+      cardOverlayCommerceMessage.hidden = true;
+      if ( cardOverlayCommerceMessage.dataset ) {
+        delete cardOverlayCommerceMessage.dataset.status;
+      }
+      return;
+    }
+
+    cardOverlayCommerceMessage.textContent = text;
+    cardOverlayCommerceMessage.hidden = false;
+
+    if ( cardOverlayCommerceMessage.dataset ) {
+      if ( status ) {
+        cardOverlayCommerceMessage.dataset.status = status;
+      } else {
+        delete cardOverlayCommerceMessage.dataset.status;
+      }
+    }
+  }
+
+  function setPriceDisplay( entry ) {
+    if ( ! cardOverlayPrice ) {
+      return;
+    }
+
+    let html = '';
+
+    if ( entry ) {
+      if ( entry.priceHtml ) {
+        html = entry.priceHtml;
+      } else if ( entry.price ) {
+        html = ( entry.currencySymbol || '' ) + String( entry.price );
+      }
+    }
+
+    if ( html ) {
+      cardOverlayPrice.innerHTML = html;
+      cardOverlayPrice.hidden = false;
+    } else {
+      cardOverlayPrice.innerHTML = '';
+      cardOverlayPrice.hidden = true;
+    }
+  }
+
+  function updateAddToCartButtonState( entry ) {
+    if ( ! cardOverlayAddToCart ) {
+      return;
+    }
+
+    if ( isAddingToCart ) {
+      cardOverlayAddToCart.textContent = i18n.addingToCart || 'Adding…';
+      cardOverlayAddToCart.disabled = true;
+      return;
+    }
+
+    cardOverlayAddToCart.textContent = i18n.addToCart || 'Add to cart';
+    cardOverlayAddToCart.disabled = ! isEntryPurchasable( entry );
+  }
+
+  function updateCommerceSelection( index ) {
+    if ( ! Array.isArray( currentCommerceEntries ) || ! currentCommerceEntries.length ) {
+      currentCommerceSelectionIndex = -1;
+      setPriceDisplay( null );
+      showCommerceMessage( '', '' );
+      updateAddToCartButtonState( null );
+      return;
+    }
+
+    let nextIndex = Number.isInteger( index ) ? index : parseInt( index, 10 );
+
+    if ( Number.isNaN( nextIndex ) || nextIndex < 0 || nextIndex >= currentCommerceEntries.length ) {
+      nextIndex = 0;
+    }
+
+    const entry = currentCommerceEntries[ nextIndex ] || null;
+    currentCommerceSelectionIndex = nextIndex;
+
+    if ( cardOverlayVariantSelect && cardOverlayVariantSelect.value !== String( nextIndex ) ) {
+      cardOverlayVariantSelect.value = String( nextIndex );
+    }
+
+    setPriceDisplay( entry );
+    showCommerceMessage( '', '' );
+
+    if ( entry && ! isEntryPurchasable( entry ) ) {
+      if ( entry.isPurchasable ) {
+        showCommerceMessage( i18n.outOfStock || 'Out of stock', 'error' );
+      } else {
+        showCommerceMessage( i18n.notPurchasable || 'This product cannot be purchased right now.', 'error' );
+      }
+    }
+
+    updateAddToCartButtonState( entry );
+  }
+
+  function getAddToCartEndpoint() {
+    if ( window.wc_add_to_cart_params && window.wc_add_to_cart_params.wc_ajax_url ) {
+      return window.wc_add_to_cart_params.wc_ajax_url.replace( '%%endpoint%%', 'add_to_cart' );
+    }
+
+    if ( window.ajaxurl ) {
+      const ajaxUrl = String( window.ajaxurl );
+
+      if ( ajaxUrl.includes( '%%endpoint%%' ) ) {
+        return ajaxUrl.replace( '%%endpoint%%', 'add_to_cart' );
+      }
+
+      return ajaxUrl;
+    }
+
+    try {
+      const url = new URL( window.location.href );
+      url.searchParams.set( 'wc-ajax', 'add_to_cart' );
+      return url.toString();
+    } catch ( error ) {
+      return '?wc-ajax=add_to_cart';
+    }
+  }
+
+  function buildAddToCartPayload( entry ) {
+    const params = new URLSearchParams();
+
+    if ( ! entry ) {
+      return params;
+    }
+
+    const productId = entry.productId || entry.parentId || entry.variationId;
+
+    if ( productId ) {
+      params.set( 'product_id', String( productId ) );
+    }
+
+    if ( entry.variationId ) {
+      params.set( 'variation_id', String( entry.variationId ) );
+    }
+
+    params.set( 'quantity', '1' );
+
+    if ( entry.attributes && 'object' === typeof entry.attributes ) {
+      Object.keys( entry.attributes ).forEach( ( key ) => {
+        const value = entry.attributes[ key ];
+
+        if ( ! key || ! value ) {
+          return;
+        }
+
+        params.set( key, value );
+      } );
+    }
+
+    return params;
+  }
+
+  function updateAddToCartLoading( loading ) {
+    isAddingToCart = !! loading;
+
+    if ( ! cardOverlayAddToCart ) {
+      return;
+    }
+
+    if ( isAddingToCart ) {
+      cardOverlayAddToCart.textContent = i18n.addingToCart || 'Adding…';
+      cardOverlayAddToCart.disabled = true;
+      return;
+    }
+
+    const entry = currentCommerceEntries[ currentCommerceSelectionIndex ] || null;
+    cardOverlayAddToCart.textContent = i18n.addToCart || 'Add to cart';
+    cardOverlayAddToCart.disabled = ! isEntryPurchasable( entry );
+  }
+
+  function formatAddedMessage( entry ) {
+    const template = i18n.addedToCart || '%s was added to your cart.';
+    const name = getEntryDisplayName( entry ) || ( currentCommerceCard && currentCommerceCard.name ) || '';
+
+    if ( template.includes( '%s' ) && name ) {
+      return template.replace( '%s', name );
+    }
+
+    return template;
+  }
+
+  function setupCommerceSection( card ) {
+    resetCommerceSection();
+
+    if ( ! card || ! Array.isArray( card.products ) || ! card.products.length ) {
+      return;
+    }
+
+    const entries = card.products
+      .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
+      .filter( Boolean );
+
+    if ( ! entries.length ) {
+      return;
+    }
+
+    currentCommerceCard = card;
+    currentCommerceEntries = entries;
+
+    if ( cardOverlayCommerce ) {
+      cardOverlayCommerce.hidden = false;
+    }
+
+    if ( cardOverlayVariantLabel && i18n.chooseVariant ) {
+      cardOverlayVariantLabel.textContent = i18n.chooseVariant;
+    }
+
+    if ( cardOverlayVariantSelect ) {
+      cardOverlayVariantSelect.disabled = false;
+      cardOverlayVariantSelect.innerHTML = '';
+    }
+
+    if ( entries.length > 1 && cardOverlayVariantContainer && cardOverlayVariantSelect ) {
+      entries.forEach( ( entry, index ) => {
+        const option = document.createElement( 'option' );
+        option.value = String( index );
+        option.textContent = getEntryOptionLabel( entry, index );
+        option.disabled = ! isEntryPurchasable( entry );
+        cardOverlayVariantSelect.appendChild( option );
+      } );
+
+      cardOverlayVariantContainer.hidden = false;
+    } else if ( cardOverlayVariantContainer ) {
+      cardOverlayVariantContainer.hidden = true;
+    }
+
+    let defaultIndex = entries.findIndex( ( entry ) => isEntryPurchasable( entry ) );
+
+    if ( defaultIndex < 0 ) {
+      defaultIndex = 0;
+    }
+
+    updateCommerceSelection( defaultIndex );
+  }
+
+  async function handleAddToCartClick() {
+    if ( isAddingToCart ) {
+      return;
+    }
+
+    const entry = currentCommerceEntries[ currentCommerceSelectionIndex ] || null;
+
+    if ( ! entry || ! isEntryPurchasable( entry ) ) {
+      return;
+    }
+
+    updateAddToCartLoading( true );
+    showCommerceMessage( '', '' );
+
+    const endpoint = getAddToCartEndpoint();
+    const payload = buildAddToCartPayload( entry );
+    let responseData = null;
+
+    try {
+      const response = await fetch( endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Accept: 'application/json, */*;q=0.1',
+        },
+        credentials: 'same-origin',
+        body: payload.toString(),
+      } );
+
+      if ( ! response.ok ) {
+        throw new Error( 'Request failed' );
+      }
+
+      responseData = await response.json().catch( () => null );
+
+      if ( responseData && responseData.error ) {
+        if ( responseData.product_url ) {
+          window.location.href = responseData.product_url;
+          return;
+        }
+
+        throw new Error( 'Add to cart error' );
+      }
+
+      showCommerceMessage( formatAddedMessage( entry ), 'success' );
+
+      try {
+        document.body.dispatchEvent(
+          new CustomEvent( 'tcgKioskCardAddedToCart', {
+            detail: { card: currentCommerceCard, product: entry, response: responseData },
+          } )
+        );
+      } catch ( error ) {
+        // Ignore dispatch errors.
+      }
+
+      if ( responseData && responseData.fragments ) {
+        try {
+          document.body.dispatchEvent( new CustomEvent( 'added_to_cart', { detail: responseData } ) );
+        } catch ( error ) {
+          // Ignore dispatch errors.
+        }
+
+        if ( window.jQuery ) {
+          window.jQuery( document.body ).trigger( 'added_to_cart', [ responseData.fragments, responseData.cart_hash, null ] );
+        }
+      }
+    } catch ( error ) {
+      console.error( error );
+      showCommerceMessage( i18n.addToCartError || 'Unable to add this item to your cart.', 'error' );
+    } finally {
+      updateAddToCartLoading( false );
+      updateAddToCartButtonState( currentCommerceEntries[ currentCommerceSelectionIndex ] || null );
+    }
+  }
+
   function openCardOverlay( card, triggerElement ) {
     if ( ! cardOverlay || ! card ) {
       return;
@@ -1107,6 +1635,8 @@ CSS;
         cardOverlayDetails.appendChild( placeholderDefinition );
       }
     }
+
+    setupCommerceSection( card );
 
     if ( cardOverlayImage ) {
       const preferredImage = card.imageFullUrl || card.imageUrl || '';
@@ -1901,6 +2431,19 @@ CSS;
     cardOverlayClose.addEventListener( 'click', () => closeCardOverlay() );
   }
 
+  if ( cardOverlayVariantSelect ) {
+    cardOverlayVariantSelect.addEventListener( 'change', () => {
+      updateCommerceSelection( cardOverlayVariantSelect.value );
+    } );
+  }
+
+  if ( cardOverlayAddToCart ) {
+    cardOverlayAddToCart.addEventListener( 'click', ( event ) => {
+      event.preventDefault();
+      handleAddToCartClick();
+    } );
+  }
+
   gameSelect.addEventListener( 'change', () => {
     hasInteracted = true;
     currentPage = 1;
@@ -1985,6 +2528,15 @@ JS;
                     <div class="tcg-kiosk__card-overlay-meta">
                         <h2 id="tcg-kiosk-detail-title" class="tcg-kiosk__card-overlay-title"></h2>
                         <dl id="tcg-kiosk-detail-metadata" class="tcg-kiosk__card-overlay-details"></dl>
+                        <div id="tcg-kiosk-card-overlay-commerce" class="tcg-kiosk__card-overlay-commerce" hidden>
+                            <div id="tcg-kiosk-card-overlay-price" class="tcg-kiosk__card-overlay-price"></div>
+                            <div id="tcg-kiosk-card-overlay-variant" class="tcg-kiosk__card-overlay-variant" hidden>
+                                <label for="tcg-kiosk-card-overlay-variant-select" id="tcg-kiosk-card-overlay-variant-label" class="tcg-kiosk__card-overlay-variant-label"><?php esc_html_e( 'Choose a version', 'tcg-kiosk-filter' ); ?></label>
+                                <select id="tcg-kiosk-card-overlay-variant-select" class="tcg-kiosk__card-overlay-variant-select"></select>
+                            </div>
+                            <button type="button" id="tcg-kiosk-card-overlay-add-to-cart" class="tcg-kiosk__card-overlay-add-to-cart" disabled><?php esc_html_e( 'Add to cart', 'tcg-kiosk-filter' ); ?></button>
+                            <p id="tcg-kiosk-card-overlay-commerce-message" class="tcg-kiosk__card-overlay-commerce-message" role="status" aria-live="polite" hidden></p>
+                        </div>
                     </div>
                 </div>
             </div>
