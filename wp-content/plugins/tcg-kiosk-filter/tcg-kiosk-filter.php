@@ -1722,20 +1722,17 @@ CSS;
       }
 
       const normalizedKey = normalizeAttributeKey( trimmedKey );
+      const localKey = `attribute_${ trimmedKey
+        .replace( /^attribute_/, '' )
+        .replace( /^_+/, '' ) }`;
 
-      if ( normalizedKey ) {
-        params.set( normalizedKey, normalizedValue );
-        params.set( `variation[${ normalizedKey }]`, normalizedValue );
-      }
-
-      if ( ! trimmedKey.startsWith( 'attribute_' ) && ! trimmedKey.startsWith( 'pa_' ) ) {
-        const localKey = `attribute_${ trimmedKey.replace( /^_+/, '' ) }`;
-
-        if ( localKey && localKey !== normalizedKey ) {
-          params.set( localKey, normalizedValue );
-          params.set( `variation[${ localKey }]`, normalizedValue );
-        }
-      }
+      [ normalizedKey, localKey ]
+        .map( ( candidate ) => ( candidate || '' ).trim() )
+        .filter( Boolean )
+        .forEach( ( attributeKey ) => {
+          params.set( attributeKey, normalizedValue );
+          params.set( `variation[${ attributeKey }]`, normalizedValue );
+        } );
     } );
 
     return params;
@@ -1845,12 +1842,13 @@ CSS;
     let responseData = null;
 
     try {
-      console.log(
-        '[Kiosk AddToCart] Endpoint:',
-        endpoint,
-        '\n[Kiosk AddToCart] Payload:',
-        payload instanceof URLSearchParams ? payload.toString() : payload
-      );
+      console.log( '[Kiosk AddToCart] Endpoint:', endpoint );
+
+      if ( payload instanceof URLSearchParams ) {
+        console.log( '[Kiosk AddToCart] Payload:', payload.toString() );
+      } else {
+        console.log( '[Kiosk AddToCart] Payload:', payload );
+      }
     } catch ( logError ) {
       console.log( '[Kiosk AddToCart] Payload log error:', logError );
     }
