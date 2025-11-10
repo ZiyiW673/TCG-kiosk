@@ -1377,13 +1377,24 @@ CSS;
     }
 
     if ( window.ajaxurl ) {
-      const ajaxUrl = String( window.ajaxurl );
+      try {
+        const ajaxUrl = new URL( window.ajaxurl, window.location.href );
 
-      if ( ajaxUrl.includes( '%%endpoint%%' ) ) {
-        return ajaxUrl.replace( '%%endpoint%%', 'add_to_cart' );
+        if ( ! ajaxUrl.searchParams.has( 'action' ) ) {
+          ajaxUrl.searchParams.set( 'action', 'woocommerce_add_to_cart' );
+        }
+
+        return ajaxUrl.toString();
+      } catch ( error ) {
+        const ajaxUrl = String( window.ajaxurl );
+        const separator = ajaxUrl.includes( '?' ) ? '&' : '?';
+
+        if ( ajaxUrl.includes( 'action=' ) ) {
+          return ajaxUrl;
+        }
+
+        return `${ ajaxUrl }${ separator }action=woocommerce_add_to_cart`;
       }
-
-      return ajaxUrl;
     }
 
     try {
@@ -1395,8 +1406,51 @@ CSS;
     }
   }
 
-  function buildAddToCartPayload( entry ) {
+  function shouldIncludeAddToCartParam( endpoint ) {
+    if ( ! endpoint ) {
+      return true;
+    }
+
+    try {
+      const url = new URL( endpoint, window.location.href );
+      const ajaxParam = url.searchParams.get( 'wc-ajax' ) || url.searchParams.get( 'wc_ajax' );
+      const actionParam = url.searchParams.get( 'action' );
+
+      if ( 'add_to_cart' === ajaxParam ) {
+        return false;
+      }
+
+      if ( 'woocommerce_add_to_cart' === actionParam ) {
+        return false;
+      }
+
+      const serialized = url.toString();
+
+      if ( serialized.includes( 'wc-ajax=add_to_cart' ) || serialized.includes( 'wc_ajax=add_to_cart' ) ) {
+        return false;
+      }
+
+      if ( serialized.includes( 'action=woocommerce_add_to_cart' ) ) {
+        return false;
+      }
+    } catch ( error ) {
+      const normalized = String( endpoint );
+
+      if ( normalized.includes( 'wc-ajax=add_to_cart' ) || normalized.includes( 'wc_ajax=add_to_cart' ) ) {
+        return false;
+      }
+
+      if ( normalized.includes( 'action=woocommerce_add_to_cart' ) ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function buildAddToCartPayload( entry, options ) {
     const params = new URLSearchParams();
+    const includeAddToCartParam = options && options.includeAddToCartParam;
 
     if ( ! entry ) {
       return params;
@@ -1408,7 +1462,10 @@ CSS;
       const idValue = String( productId );
 
       params.set( 'product_id', idValue );
-      params.set( 'add-to-cart', idValue );
+
+      if ( includeAddToCartParam ) {
+        params.set( 'add-to-cart', idValue );
+      }
     }
 
     if ( entry.variationId ) {
@@ -1574,7 +1631,9 @@ CSS;
     showCommerceMessage( '', '' );
 
     const endpoint = getAddToCartEndpoint();
-    const payload = buildAddToCartPayload( entry );
+    const payload = buildAddToCartPayload( entry, {
+      includeAddToCartParam: shouldIncludeAddToCartParam( endpoint ),
+    } );
     let responseData = null;
 
     try {
