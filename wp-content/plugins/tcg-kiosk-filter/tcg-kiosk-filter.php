@@ -1448,23 +1448,87 @@ CSS;
     return true;
   }
 
+
+  function toPositiveInt( value ) {
+    const parsed = Number.parseInt( value, 10 );
+
+    return Number.isInteger( parsed ) && parsed > 0 ? parsed : 0;
+  }
+
+  function isLikelyVariationObject( value ) {
+    if ( ! value || 'object' !== typeof value ) {
+      return false;
+    }
+
+    if ( value.type === 'variation' || value.isVariation || value.is_variation ) {
+      return true;
+    }
+
+    if ( toPositiveInt( value.parentId ) || toPositiveInt( value.parent_id ) ) {
+      return true;
+    }
+
+    if ( toPositiveInt( value.variationId ) || toPositiveInt( value.variation_id ) ) {
+      return true;
+    }
+
+    if ( 'object' === typeof value.attributes && Object.keys( value.attributes ).length ) {
+      return true;
+    }
+
+    if ( 'object' === typeof value.selectedAttributes && Object.keys( value.selectedAttributes ).length ) {
+      return true;
+    }
+
+    if ( 'object' === typeof value.variationAttributes && Object.keys( value.variationAttributes ).length ) {
+      return true;
+    }
+
+    if ( 'object' === typeof value.attribute_data && Object.keys( value.attribute_data ).length ) {
+      return true;
+    }
+
+    return false;
+  }
+
   function getEntryVariationId( entry ) {
     if ( ! entry || 'object' !== typeof entry ) {
       return 0;
     }
 
-    const candidates = [];
+    const candidates = [
+      entry.selectedVariationId,
+      entry.selected_variation_id,
+      entry.variationId,
+      entry.variation_id,
+      entry.variationID,
+    ];
+    const variationLike = isLikelyVariationObject( entry );
 
-    if ( entry.type === 'variation' ) {
-      candidates.push( entry.variationId, entry.variation_id, entry.id );
-    } else {
-      candidates.push( entry.variationId, entry.variation_id );
+    if ( variationLike ) {
+      candidates.push( entry.id, entry.ID );
+    }
+
+    if ( entry.selectedVariation && 'object' === typeof entry.selectedVariation ) {
+      candidates.push(
+        entry.selectedVariation.variationId,
+        entry.selectedVariation.variation_id,
+        entry.selectedVariation.id
+      );
+    }
+
+    if ( entry.variation && 'object' === typeof entry.variation ) {
+      candidates.push(
+        entry.variation.variationId,
+        entry.variation.variation_id,
+        entry.variation.id
+      );
     }
 
     for ( const candidate of candidates ) {
-      const parsed = Number.parseInt( candidate, 10 );
+      const parsed = toPositiveInt( candidate );
 
-      if ( Number.isInteger( parsed ) && parsed > 0 ) {
+      if ( parsed ) {
         return parsed;
       }
     }
@@ -1503,6 +1567,14 @@ CSS;
       return entry.selectedVariation;
     }
 
+    if ( entry.selected_variation && 'object' === typeof entry.selected_variation ) {
+      return entry.selected_variation;
+    }
+
+    if ( entry.currentVariation && 'object' === typeof entry.currentVariation ) {
+      return entry.currentVariation;
+    }
+
     if ( entry.variation && 'object' === typeof entry.variation ) {
       return entry.variation;
     }
@@ -1524,25 +1596,56 @@ CSS;
     const includeAddToCartParam = options && options.includeAddToCartParam;
 
     const variationSource = resolveVariationSource( entry );
-    const isVariation = !! variationSource;
-    const parentId =
-      entry.parentId ||
-      entry.parent_id ||
-      ( isVariation
-        ? Number.parseInt(
-            variationSource.parent_id ||
-              variationSource.product_id ||
-              entry.product_id ||
-              0,
-            10
-          ) || 0
-        : 0 );
-    const productId =
-      entry.productId ||
-      ( isVariation
-        ? parentId
-        : Number.parseInt( entry.id || entry.product_id || 0, 10 ) || 0 );
-    const variationId = getEntryVariationId( variationSource || entry );
+    const variationReference = variationSource || entry;
+    const isVariation = !! variationSource || isLikelyVariationObject( variationReference );
+    const variationId = getEntryVariationId( variationReference );
+
+    const parentCandidates = [
+      entry.parentId,
+      entry.parent_id,
+      entry.parent && entry.parent.id,
+      entry.parent && entry.parent.ID,
+      variationReference && variationReference.parentId,
+      variationReference && variationReference.parent_id,
+      variationReference && variationReference.product_id,
+      variationReference && variationReference.productId,
+      variationReference && variationReference.parent && variationReference.parent.id,
+      variationReference && variationReference.parent && variationReference.parent.ID,
+      entry.product_parent_id,
+      entry.productParentId,
+      entry.product && entry.product.id,
+      entry.product && entry.product.ID,
+    ];
+
+    if ( variationId && entry.productId && toPositiveInt( entry.productId ) !== variationId ) {
+      parentCandidates.push( entry.productId );
+    }
+
+    if ( variationId && entry.product_id && toPositiveInt( entry.product_id ) !== variationId ) {
+      parentCandidates.push( entry.product_id );
+    }
+
+    const parentId = parentCandidates
+      .map( toPositiveInt )
+      .find( ( value ) => value ) || 0;
+
+    let productId = toPositiveInt( entry.productId );
+
+    if ( ! productId ) {
+      productId = toPositiveInt( entry.product_id );
+    }
+
+    if ( ! productId && entry.product && 'object' === typeof entry.product ) {
+      productId = toPositiveInt( entry.product.id ) || toPositiveInt( entry.product.ID );
+    }
+
+    if ( ! productId && isVariation ) {
+      productId = parentId;
+    }
+
+    if ( ! productId && ! isVariation ) {
+      productId = toPositiveInt( entry.id ) || toPositiveInt( entry.ID );
+    }
 
     if ( productId ) {
       params.set( 'product_id', String( productId ) );
@@ -1563,43 +1666,77 @@ CSS;
     const quantity = Number.parseInt( entry.quantity, 10 );
     params.set( 'quantity', String( Number.isInteger( quantity ) && quantity > 0 ? quantity : 1 ) );
 
-    const attributes =
-      ( variationSource && variationSource.attributes ) ||
-      entry.selectedAttributes ||
-      entry.attributes ||
-      {};
+    const attributeSources = [];
 
-    if ( attributes && 'object' === typeof attributes ) {
-      Object.entries( attributes ).forEach( ( [ key, value ] ) => {
-        const rawKey = String( key );
-        const trimmedKey = rawKey.trim();
-        const normalizedValue = String( value || '' ).trim();
+    if ( variationSource && 'object' === typeof variationSource.attributes ) {
+      attributeSources.push( variationSource.attributes );
+    }
 
-        if ( ! normalizedValue ) {
-          return;
+    if ( variationSource && 'object' === typeof variationSource.attribute_data ) {
+      attributeSources.push( variationSource.attribute_data );
+    }
+
+    if ( entry.selectedAttributes && 'object' === typeof entry.selectedAttributes ) {
+      attributeSources.push( entry.selectedAttributes );
+    }
+
+    if ( entry.variationAttributes && 'object' === typeof entry.variationAttributes ) {
+      attributeSources.push( entry.variationAttributes );
+    }
+
+    if ( entry.attribute_data && 'object' === typeof entry.attribute_data ) {
+      attributeSources.push( entry.attribute_data );
+    }
+
+    if ( entry.attributes && 'object' === typeof entry.attributes ) {
+      attributeSources.push( entry.attributes );
+    }
+
+    const flattenedAttributes = {};
+
+    attributeSources.forEach( ( source ) => {
+      Object.entries( source ).forEach( ( [ key, value ] ) => {
+        if ( 'undefined' === typeof flattenedAttributes[ key ] ) {
+          flattenedAttributes[ key ] = value;
         }
+      } );
+    } );
 
-        const normalizedKey = normalizeAttributeKey( trimmedKey );
-
-        if ( normalizedKey ) {
-          params.set( normalizedKey, normalizedValue );
-          params.set( `variation[${ normalizedKey }]`, normalizedValue );
-        }
-
-        if (
-          trimmedKey &&
-          ! trimmedKey.startsWith( 'attribute_' ) &&
-          ! trimmedKey.startsWith( 'pa_' )
-        ) {
-          const localKey = `attribute_${ trimmedKey.replace( /^_+/, '' ) }`;
-
-          if ( localKey && localKey !== normalizedKey ) {
-            params.set( localKey, normalizedValue );
-            params.set( `variation[${ localKey }]`, normalizedValue );
+    if ( variationSource && 'object' === typeof variationSource ) {
+      Object.entries( variationSource ).forEach( ( [ key, value ] ) => {
+        if ( key.startsWith( 'attribute_' ) || key.startsWith( 'pa_' ) ) {
+          if ( 'undefined' === typeof flattenedAttributes[ key ] ) {
+            flattenedAttributes[ key ] = value;
           }
         }
       } );
     }
+
+    Object.entries( flattenedAttributes ).forEach( ( [ key, value ] ) => {
+      const rawKey = String( key );
+      const trimmedKey = rawKey.trim();
+      const normalizedValue = String( value || '' ).trim();
+
+      if ( ! trimmedKey || ! normalizedValue ) {
+        return;
+      }
+
+      const normalizedKey = normalizeAttributeKey( trimmedKey );
+
+      if ( normalizedKey ) {
+        params.set( normalizedKey, normalizedValue );
+        params.set( `variation[${ normalizedKey }]`, normalizedValue );
+      }
+
+      if ( ! trimmedKey.startsWith( 'attribute_' ) && ! trimmedKey.startsWith( 'pa_' ) ) {
+        const localKey = `attribute_${ trimmedKey.replace( /^_+/, '' ) }`;
+
+        if ( localKey && localKey !== normalizedKey ) {
+          params.set( localKey, normalizedValue );
+          params.set( `variation[${ localKey }]`, normalizedValue );
+        }
+      }
+    } );
 
     return params;
   }
