@@ -683,7 +683,7 @@ header {
 .tcg-kiosk__actions {
     flex: 0 0 25%;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 1rem;
     margin-top: 14px;
 }
@@ -691,12 +691,19 @@ header {
 .tcg-kiosk__search {
     position: relative;
     display: flex;
-    width: 80%;
-    height: 80%;
+    width: 100%;
     margin-top: 16px;
 }
 
 .tcg-kiosk__search input[type="search"] {
+    width: 100%;
+}
+
+.tcg-kiosk__actions-footer {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    justify-content: space-between;
     width: 100%;
 }
 
@@ -705,14 +712,21 @@ header {
     flex-direction: column;
     font-weight: 600;
     color: #1d2327;
-    width: 18%;
-    margin-right: 0;
-    margin-left: auto;
-    font-size: 9px;
+    font-size: 0.75rem;
+    min-width: 0;
+    flex: 0 1 auto;
 }
 
 .tcg-kiosk__page-size select {
     margin-top: 0.35rem;
+}
+
+.tcg-kiosk__pagination {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1 1 auto;
 }
 
 .tcg-kiosk__grid {
@@ -796,13 +810,6 @@ header {
     color: #50575e;
 }
 
-.tcg-kiosk__pagination {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    justify-content: center;
-}
-
 .tcg-kiosk__page-button {
     border-radius: 4px;
     border: 1px solid #2271b1;
@@ -844,6 +851,16 @@ header {
     .tcg-kiosk__type-filter,
     .tcg-kiosk__actions {
         flex: 1 1 100%;
+    }
+
+    .tcg-kiosk__actions-footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .tcg-kiosk__pagination {
+        width: 100%;
+        justify-content: flex-start;
     }
 }
 
@@ -2804,19 +2821,21 @@ JS;
                         <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
                         <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
                     </div>
-                    <label class="tcg-kiosk__page-size" for="tcg-kiosk-page-size">
-                        <span><?php esc_html_e( 'Cards per page', 'tcg-kiosk-filter' ); ?></span>
-                        <select id="tcg-kiosk-page-size" class="tcg-kiosk__select">
-                            <option value="10" selected>10</option>
-                            <option value="12">12</option>
-                            <option value="16">16</option>
-                            <option value="20">20</option>
-                        </select>
-                    </label>
+                    <div class="tcg-kiosk__actions-footer">
+                        <label class="tcg-kiosk__page-size" for="tcg-kiosk-page-size">
+                            <span><?php esc_html_e( 'Cards per page', 'tcg-kiosk-filter' ); ?></span>
+                            <select id="tcg-kiosk-page-size" class="tcg-kiosk__select">
+                                <option value="10" selected>10</option>
+                                <option value="12">12</option>
+                                <option value="16">16</option>
+                                <option value="20">20</option>
+                            </select>
+                        </label>
+                        <nav id="tcg-kiosk-pagination" class="tcg-kiosk__pagination" aria-label="<?php esc_attr_e( 'Card results pagination', 'tcg-kiosk-filter' ); ?>" hidden></nav>
+                    </div>
                 </div>
             </header>
             <div id="tcg-kiosk-results" class="tcg-kiosk__grid" aria-live="polite"></div>
-            <nav id="tcg-kiosk-pagination" class="tcg-kiosk__pagination" aria-label="<?php esc_attr_e( 'Card results pagination', 'tcg-kiosk-filter' ); ?>" hidden></nav>
         </div>
         <?php
         return ob_get_clean();
