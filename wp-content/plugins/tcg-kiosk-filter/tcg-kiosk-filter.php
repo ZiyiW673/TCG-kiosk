@@ -1291,6 +1291,69 @@ CSS;
     return purchasable && ( inStock || backordersAllowed );
   }
 
+  function pruneVariationParentEntries( entries ) {
+    if ( ! Array.isArray( entries ) || entries.length < 2 ) {
+      return Array.isArray( entries ) ? entries : [];
+    }
+
+    const parentIdsWithVariations = new Set();
+
+    entries.forEach( ( entry ) => {
+      if ( ! entry || 'object' !== typeof entry ) {
+        return;
+      }
+
+      const hasVariationId = toPositiveInt( entry.variationId ) || toPositiveInt( entry.variation_id );
+      const isVariationType = entry.type === 'variation';
+
+      if ( ! hasVariationId && ! isVariationType ) {
+        return;
+      }
+
+      const parentId =
+        toPositiveInt( entry.parentId ) ||
+        toPositiveInt( entry.parent_id ) ||
+        toPositiveInt( entry.productId ) ||
+        toPositiveInt( entry.product_id );
+
+      if ( parentId ) {
+        parentIdsWithVariations.add( parentId );
+      }
+    } );
+
+    if ( ! parentIdsWithVariations.size ) {
+      return entries;
+    }
+
+    const filtered = entries.filter( ( entry ) => {
+      if ( ! entry || 'object' !== typeof entry ) {
+        return false;
+      }
+
+      if ( entry.type !== 'variable' ) {
+        return true;
+      }
+
+      if ( toPositiveInt( entry.variationId ) || toPositiveInt( entry.variation_id ) ) {
+        return true;
+      }
+
+      const candidateParentId =
+        toPositiveInt( entry.productId ) ||
+        toPositiveInt( entry.product_id ) ||
+        toPositiveInt( entry.parentId ) ||
+        toPositiveInt( entry.parent_id );
+
+      if ( candidateParentId && parentIdsWithVariations.has( candidateParentId ) ) {
+        return false;
+      }
+
+      return true;
+    } );
+
+    return filtered.length ? filtered : entries;
+  }
+
   function showCommerceMessage( message, status ) {
     if ( ! cardOverlayCommerceMessage ) {
       return;
@@ -1709,9 +1772,11 @@ CSS;
       return;
     }
 
-    const entries = card.products
+    let entries = card.products
       .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
       .filter( Boolean );
+
+    entries = pruneVariationParentEntries( entries );
 
     if ( ! entries.length ) {
       return;
