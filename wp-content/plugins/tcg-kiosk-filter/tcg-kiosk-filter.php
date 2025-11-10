@@ -1512,6 +1512,12 @@ CSS;
       return false;
     }
 
+    const responseHasCartData = responseIncludesCartData( responseData );
+
+    if ( responseHasCartData ) {
+      return false;
+    }
+
     if ( responseContainsWooCommerceError( responseData ) ) {
       return true;
     }
@@ -1537,10 +1543,6 @@ CSS;
     }
 
     if ( Object.prototype.hasOwnProperty.call( responseData, 'error' ) ) {
-      if ( responseIncludesCartData( responseData ) ) {
-        return false;
-      }
-
       return Boolean( responseData.error );
     }
 
