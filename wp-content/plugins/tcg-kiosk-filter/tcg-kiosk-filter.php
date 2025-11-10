@@ -1436,6 +1436,119 @@ CSS;
     return text.trim();
   }
 
+  function responseContainsWooCommerceError( responseData ) {
+    if ( ! responseData || 'object' !== typeof responseData ) {
+      return false;
+    }
+
+    const { messages } = responseData;
+
+    if ( ! messages || 'string' !== typeof messages ) {
+      return false;
+    }
+
+    commerceMessageParser.innerHTML = messages;
+
+    const hasErrorNotice =
+      !! commerceMessageParser.querySelector &&
+      !! commerceMessageParser.querySelector( '.woocommerce-error, .woocommerce-message--error' );
+
+    commerceMessageParser.innerHTML = '';
+
+    return hasErrorNotice;
+  }
+
+  function normalizeResponseFlag( value ) {
+    if ( null === value || undefined === value ) {
+      return null;
+    }
+
+    if ( true === value || false === value ) {
+      return value;
+    }
+
+    if ( 'number' === typeof value ) {
+      return value !== 0;
+    }
+
+    if ( 'string' === typeof value ) {
+      const normalized = value.trim().toLowerCase();
+
+      if ( ! normalized ) {
+        return false;
+      }
+
+      if ( [ 'true', '1', 'yes', 'y', 'error', 'errors' ].includes( normalized ) ) {
+        return true;
+      }
+
+      if ( [ 'false', '0', 'no', 'n', 'success', 'passed' ].includes( normalized ) ) {
+        return false;
+      }
+    }
+
+    return null;
+  }
+
+  function responseIncludesCartData( responseData ) {
+    if ( ! responseData || 'object' !== typeof responseData ) {
+      return false;
+    }
+
+    const hasFragments =
+      responseData.fragments &&
+      'object' === typeof responseData.fragments &&
+      Object.keys( responseData.fragments ).length > 0;
+
+    const hasCartHash =
+      ( 'string' === typeof responseData.cart_hash && responseData.cart_hash.trim() ) ||
+      ( 'number' === typeof responseData.cart_hash && ! Number.isNaN( responseData.cart_hash ) );
+
+    return !! ( hasFragments || hasCartHash );
+  }
+
+  function responseIndicatesAddToCartError( responseData ) {
+    if ( ! responseData || 'object' !== typeof responseData ) {
+      return false;
+    }
+
+    const responseHasCartData = responseIncludesCartData( responseData );
+
+    if ( responseHasCartData ) {
+      return false;
+    }
+
+    if ( responseContainsWooCommerceError( responseData ) ) {
+      return true;
+    }
+
+    const normalizedError = normalizeResponseFlag( responseData.error );
+
+    if ( true === normalizedError ) {
+      return true;
+    }
+
+    if ( false === normalizedError ) {
+      return false;
+    }
+
+    const normalizedSuccess = normalizeResponseFlag( responseData.success );
+
+    if ( false === normalizedSuccess ) {
+      return true;
+    }
+
+    if ( true === normalizedSuccess ) {
+      return false;
+    }
+
+    if ( Object.prototype.hasOwnProperty.call( responseData, 'error' ) ) {
+      return Boolean( responseData.error );
+    }
+
+    return false;
+  }
+
   function getAddToCartErrorMessage( responseData, entry ) {
     const candidates = [];
 
@@ -1630,32 +1743,49 @@ CSS;
       params.set( 'security', nonce );
     }
 
-    const parentId = entry.parentId || entry.productId || 0;
-    const productId = entry.productId || parentId || entry.variationId || 0;
+    const parentId = parseInt( entry.parentId || 0, 10 ) || 0;
+    const rawProductId = parseInt( entry.productId || 0, 10 ) || 0;
+    const variationId = parseInt( entry.variationId || 0, 10 ) || 0;
+
+    const addToCartId = parentId || rawProductId || variationId;
+    const productId = rawProductId || parentId || variationId;
 
     if ( productId ) {
       params.set( 'product_id', String( productId ) );
     }
 
-    if ( parentId || productId ) {
-      params.set( 'add-to-cart', String( parentId || productId ) );
+    if ( addToCartId ) {
+      params.set( 'add-to-cart', String( addToCartId ) );
     }
 
-    if ( entry.variationId ) {
-      params.set( 'variation_id', String( entry.variationId ) );
+    if ( variationId ) {
+      params.set( 'variation_id', String( variationId ) );
     }
 
-    params.set( 'quantity', '1' );
+    params.set( 'quantity', entry.quantity ? String( entry.quantity ) : '1' );
 
     if ( entry.attributes && 'object' === typeof entry.attributes ) {
       Object.keys( entry.attributes ).forEach( ( key ) => {
-        const value = entry.attributes[ key ];
-
-        if ( ! key || ! value ) {
+        if ( ! key ) {
           return;
         }
 
-        params.set( key, value );
+        const value = entry.attributes[ key ];
+
+        if ( value === undefined || value === null || ( '' === value && '0' !== value ) ) {
+          return;
+        }
+
+        const stringKey = String( key ).trim();
+
+        if ( ! stringKey ) {
+          return;
+        }
+
+        const stringValue = String( value );
+
+        params.set( stringKey, stringValue );
+        params.set( `variation[${ stringKey }]`, stringValue );
       } );
     }
 
@@ -1927,7 +2057,9 @@ CSS;
 
       responseData = await response.json().catch( () => null );
 
-      if ( responseData && responseData.error ) {
+      const responseHasError = responseIndicatesAddToCartError( responseData );
+
+      if ( responseHasError ) {
         showCommerceMessage( getAddToCartErrorMessage( responseData, entry ), 'error' );
         return;
       }
