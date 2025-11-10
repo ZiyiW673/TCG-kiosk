@@ -688,22 +688,22 @@ header {
     margin-top: 14px;
 }
 
+.tcg-kiosk__actions-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    width: 100%;
+    flex-wrap: wrap;
+}
+
 .tcg-kiosk__search {
     position: relative;
     display: flex;
     width: 100%;
-    margin-top: 16px;
+    flex: 1 1 auto;
 }
 
 .tcg-kiosk__search input[type="search"] {
-    width: 100%;
-}
-
-.tcg-kiosk__actions-footer {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    justify-content: space-between;
     width: 100%;
 }
 
@@ -853,9 +853,9 @@ header {
         flex: 1 1 100%;
     }
 
-    .tcg-kiosk__actions-footer {
+    .tcg-kiosk__actions-row {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
     }
 
     .tcg-kiosk__pagination {
@@ -2817,11 +2817,7 @@ JS;
                     <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
                 </div>
                 <div class="tcg-kiosk__actions">
-                    <div class="tcg-kiosk__search" role="search">
-                        <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
-                        <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
-                    </div>
-                    <div class="tcg-kiosk__actions-footer">
+                    <div class="tcg-kiosk__actions-row">
                         <label class="tcg-kiosk__page-size" for="tcg-kiosk-page-size">
                             <span><?php esc_html_e( 'Cards per page', 'tcg-kiosk-filter' ); ?></span>
                             <select id="tcg-kiosk-page-size" class="tcg-kiosk__select">
@@ -2831,8 +2827,12 @@ JS;
                                 <option value="20">20</option>
                             </select>
                         </label>
-                        <nav id="tcg-kiosk-pagination" class="tcg-kiosk__pagination" aria-label="<?php esc_attr_e( 'Card results pagination', 'tcg-kiosk-filter' ); ?>" hidden></nav>
+                        <div class="tcg-kiosk__search" role="search">
+                            <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
+                            <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
+                        </div>
                     </div>
+                    <nav id="tcg-kiosk-pagination" class="tcg-kiosk__pagination" aria-label="<?php esc_attr_e( 'Card results pagination', 'tcg-kiosk-filter' ); ?>" hidden></nav>
                 </div>
             </header>
             <div id="tcg-kiosk-results" class="tcg-kiosk__grid" aria-live="polite"></div>
