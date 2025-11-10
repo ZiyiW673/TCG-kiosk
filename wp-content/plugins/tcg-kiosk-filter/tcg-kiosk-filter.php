@@ -1419,17 +1419,61 @@ CSS;
 
     if ( entry.attributes && 'object' === typeof entry.attributes ) {
       Object.keys( entry.attributes ).forEach( ( key ) => {
-        const value = entry.attributes[ key ];
+        const rawValue = entry.attributes[ key ];
 
-        if ( ! key || ! value ) {
+        if ( ! key || null === rawValue || undefined === rawValue ) {
           return;
         }
 
-        params.set( key, value );
+        const normalizedKey = normalizeAttributeKey( key );
+
+        if ( ! normalizedKey ) {
+          return;
+        }
+
+        const normalizedValue = String( rawValue ).trim();
+
+        if ( ! normalizedValue ) {
+          return;
+        }
+
+        params.set( normalizedKey, normalizedValue );
       } );
     }
 
     return params;
+  }
+
+  function normalizeAttributeKey( key ) {
+    if ( ! key ) {
+      return '';
+    }
+
+    const trimmed = String( key ).trim();
+
+    if ( ! trimmed ) {
+      return '';
+    }
+
+    if ( trimmed.startsWith( 'attribute_' ) ) {
+      return 'attribute_' === trimmed ? '' : trimmed;
+    }
+
+    const withoutPrefix = trimmed.startsWith( 'attribute' )
+      ? trimmed.replace( /^attribute_?/, '' )
+      : trimmed.replace( /^_+/, '' );
+
+    if ( withoutPrefix.startsWith( 'pa_' ) ) {
+      return `attribute_${ withoutPrefix }`;
+    }
+
+    const candidate = withoutPrefix || trimmed;
+
+    if ( ! candidate ) {
+      return '';
+    }
+
+    return `attribute_${ candidate }`;
   }
 
   function updateAddToCartLoading( loading ) {
@@ -1551,6 +1595,13 @@ CSS;
       responseData = await response.json().catch( () => null );
 
       if ( responseData && responseData.error ) {
+        const message = extractErrorMessage( responseData );
+
+        if ( message ) {
+          showCommerceMessage( message, 'error' );
+          return;
+        }
+
         if ( responseData.product_url ) {
           window.location.href = responseData.product_url;
           return;
@@ -1584,11 +1635,36 @@ CSS;
       }
     } catch ( error ) {
       console.error( error );
-      showCommerceMessage( i18n.addToCartError || 'Unable to add this item to your cart.', 'error' );
+
+      if ( ! responseData || ! responseData.error ) {
+        showCommerceMessage( i18n.addToCartError || 'Unable to add this item to your cart.', 'error' );
+      }
     } finally {
       updateAddToCartLoading( false );
       updateAddToCartButtonState( currentCommerceEntries[ currentCommerceSelectionIndex ] || null );
     }
+  }
+
+  function extractErrorMessage( responseData ) {
+    if ( ! responseData ) {
+      return '';
+    }
+
+    if ( responseData.messages && 'string' === typeof responseData.messages ) {
+      const container = document.createElement( 'div' );
+      container.innerHTML = responseData.messages;
+      const text = container.textContent || container.innerText || '';
+
+      if ( text ) {
+        return text.replace( /\s+/g, ' ' ).trim();
+      }
+    }
+
+    if ( responseData.error && responseData.message ) {
+      return String( responseData.message );
+    }
+
+    return '';
   }
 
   function openCardOverlay( card, triggerElement ) {

@@ -873,6 +873,20 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     continue;
                 }
 
+                if ( 0 !== strpos( $attribute_key, 'attribute_' ) ) {
+                    $normalized_key = ltrim( $attribute_key, '_' );
+
+                    if ( 0 === strpos( $normalized_key, 'attribute_' ) ) {
+                        $normalized_key = substr( $normalized_key, strlen( 'attribute_' ) );
+                    }
+
+                    if ( '' === $normalized_key ) {
+                        continue;
+                    }
+
+                    $attribute_key = 'attribute_' . $normalized_key;
+                }
+
                 if ( is_array( $value ) ) {
                     $value = reset( $value );
                 }
@@ -885,6 +899,10 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $attribute_value = sanitize_text_field( $attribute_value );
                 } else {
                     $attribute_value = $this->sanitize_text_value( $attribute_value );
+                }
+
+                if ( 0 === strpos( $attribute_key, 'attribute_pa_' ) && function_exists( 'sanitize_title' ) ) {
+                    $attribute_value = sanitize_title( $attribute_value );
                 }
 
                 $prepared[ $attribute_key ] = $attribute_value;
