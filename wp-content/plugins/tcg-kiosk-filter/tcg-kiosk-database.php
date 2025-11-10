@@ -957,7 +957,23 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $attribute_value = $this->sanitize_text_value( $attribute_value );
                 }
 
-                $prepared[ $attribute_key ] = $attribute_value;
+                $submission_key = $attribute_key;
+
+                if ( 0 !== strpos( $submission_key, 'attribute_' ) ) {
+                    $normalized_key = ltrim( $submission_key, '_' );
+
+                    if ( '' !== $normalized_key ) {
+                        $submission_key = 'attribute_' . $normalized_key;
+                    } else {
+                        $submission_key = 'attribute_' . $submission_key;
+                    }
+                }
+
+                $prepared[ $submission_key ] = $attribute_value;
+
+                if ( $submission_key !== $attribute_key ) {
+                    $prepared[ $attribute_key ] = $attribute_value;
+                }
             }
 
             return $prepared;
