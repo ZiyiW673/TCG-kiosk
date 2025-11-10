@@ -1536,26 +1536,34 @@ CSS;
     return 0;
   }
 
-  function normalizeAttributeKey( key ) {
+  function expandAttributeKeysForWoo( key ) {
     if ( ! key ) {
-      return '';
+      return [];
     }
 
-    const normalizedKey = String( key ).trim();
+    const trimmedKey = String( key ).trim();
 
-    if ( ! normalizedKey ) {
-      return '';
+    if ( ! trimmedKey ) {
+      return [];
     }
 
-    if ( normalizedKey.startsWith( 'attribute_' ) ) {
-      return normalizedKey;
+    let base = trimmedKey;
+
+    if ( base.startsWith( 'attribute_pa_' ) ) {
+      base = base.replace( /^attribute_pa_/, '' );
+    } else if ( base.startsWith( 'attribute_' ) ) {
+      base = base.replace( /^attribute_/, '' );
+    } else if ( base.startsWith( 'pa_' ) ) {
+      base = base.replace( /^pa_/, '' );
+    } else {
+      base = base.replace( /^_+/, '' );
     }
 
-    if ( normalizedKey.startsWith( 'pa_' ) ) {
-      return `attribute_${ normalizedKey }`;
+    if ( ! base ) {
+      return [];
     }
 
-    return `attribute_pa_${ normalizedKey.replace( /^_+/, '' ) }`;
+    return [ `attribute_pa_${ base }`, `attribute_${ base }` ];
   }
 
   function resolveVariationSource( entry ) {
@@ -1713,26 +1721,22 @@ CSS;
     }
 
     Object.entries( flattenedAttributes ).forEach( ( [ key, value ] ) => {
-      const rawKey = String( key );
-      const trimmedKey = rawKey.trim();
       const normalizedValue = String( value || '' ).trim();
 
-      if ( ! trimmedKey || ! normalizedValue ) {
+      if ( ! normalizedValue ) {
         return;
       }
 
-      const normalizedKey = normalizeAttributeKey( trimmedKey );
-      const localKey = `attribute_${ trimmedKey
-        .replace( /^attribute_/, '' )
-        .replace( /^_+/, '' ) }`;
+      const attributeKeys = expandAttributeKeysForWoo( key );
 
-      [ normalizedKey, localKey ]
-        .map( ( candidate ) => ( candidate || '' ).trim() )
-        .filter( Boolean )
-        .forEach( ( attributeKey ) => {
-          params.set( attributeKey, normalizedValue );
-          params.set( `variation[${ attributeKey }]`, normalizedValue );
-        } );
+      attributeKeys.forEach( ( attributeKey ) => {
+        if ( ! attributeKey ) {
+          return;
+        }
+
+        params.set( attributeKey, normalizedValue );
+        params.set( `variation[${ attributeKey }]`, normalizedValue );
+      } );
     } );
 
     return params;
