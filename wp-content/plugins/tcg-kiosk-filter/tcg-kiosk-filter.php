@@ -365,10 +365,6 @@ header {
     color: #111;
 }
 
-.tcg-kiosk__card-overlay-price-label {
-    font-weight: 600;
-}
-
 .tcg-kiosk__card-overlay-price-amount {
     display: inline-flex;
     gap: 0.25rem;
@@ -1246,14 +1242,8 @@ CSS;
   }
 
   function getEntryDisplayName( entry ) {
-    if ( entry ) {
-      if ( entry.attributeSummary ) {
-        return entry.attributeSummary;
-      }
-
-      if ( entry.name ) {
-        return entry.name;
-      }
+    if ( entry && entry.name ) {
+      return entry.name;
     }
 
     if ( currentCommerceCard && currentCommerceCard.name ) {
@@ -1267,10 +1257,6 @@ CSS;
     const candidates = [];
 
     if ( entry ) {
-      if ( entry.attributeSummary ) {
-        candidates.push( entry.attributeSummary );
-      }
-
       if ( entry.name ) {
         candidates.push( entry.name );
       }
@@ -1381,30 +1367,8 @@ CSS;
       return;
     }
 
-    const variantLabelCandidates = [];
-
-    if ( entry.attributeSummary ) {
-      variantLabelCandidates.push( entry.attributeSummary );
-    }
-
-    if ( entry.type === 'variation' && entry.name ) {
-      variantLabelCandidates.push( entry.name );
-    }
-
-    const variantLabel = variantLabelCandidates
-      .map( ( value ) => ( value && value.trim ? value.trim() : '' ) )
-      .find( ( value ) => value ) || '';
-
     const stockLabel = formatStockLabel( entry );
     const fragment = document.createDocumentFragment();
-
-    if ( variantLabel ) {
-      const labelSpan = document.createElement( 'span' );
-      labelSpan.className = 'tcg-kiosk__card-overlay-price-label';
-      const trimmedLabel = variantLabel.endsWith( ':' ) ? variantLabel : `${ variantLabel }:`;
-      labelSpan.textContent = trimmedLabel;
-      fragment.appendChild( labelSpan );
-    }
 
     const amountSpan = document.createElement( 'span' );
     amountSpan.className = 'tcg-kiosk__card-overlay-price-amount';
