@@ -27,6 +27,20 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
         protected $set_cache = array();
 
         /**
+         * Cached lookup of card identifiers that exist as WooCommerce products.
+         *
+         * @var array|null
+         */
+        protected $product_card_lookup = null;
+
+        /**
+         * Whether the WooCommerce product lookup has been initialised.
+         *
+         * @var bool
+         */
+        protected $product_card_lookup_ready = false;
+
+        /**
          * TCG_Kiosk_Database constructor.
          *
          * @param string $database_path Absolute path to the database directory.
@@ -70,15 +84,16 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 $context = $this->get_set_context( $type_slug, $directory );
 
                 $data['cards'][] = array(
-                    'slug'                => $type_slug,
-                    'label'               => $this->humanize_label( $type_slug ),
-                    'typeLabel'           => $config['label'],
-                    'typeOptions'         => $config['options'],
-                    'typeMatchMode'       => $config['match_mode'],
-                    'typeCaseInsensitive' => $config['case_insensitive'],
-                    'overlayImage'        => $this->get_overlay_image_url( $type_slug ),
-                    'setOrder'            => isset( $context['order'] ) && is_array( $context['order'] ) ? array_values( $context['order'] ) : array(),
-                    'cards'               => $cards,
+                    'slug'                   => $type_slug,
+                    'label'                  => $this->humanize_label( $type_slug ),
+                    'typeLabel'              => $config['label'],
+                    'typeOptions'            => $config['options'],
+                    'typeIncludeAllOption'   => array_key_exists( 'include_all_option', $config ) ? (bool) $config['include_all_option'] : true,
+                    'typeMatchMode'          => $config['match_mode'],
+                    'typeCaseInsensitive'    => $config['case_insensitive'],
+                    'overlayImage'           => $this->get_overlay_image_url( $type_slug ),
+                    'setOrder'               => isset( $context['order'] ) && is_array( $context['order'] ) ? array_values( $context['order'] ) : array(),
+                    'cards'                  => $cards,
                 );
             }
 
@@ -146,6 +161,12 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         continue;
                     }
 
+                    $product_matches = $this->get_card_product_matches( $card, $type_slug );
+
+                    if ( ! $this->should_include_card( $card, $type_slug, $product_matches ) ) {
+                        continue;
+                    }
+
                     $image_sources = $this->prepare_image_sources( $card['images'] );
 
                     if ( empty( $image_sources['primary'] ) ) {
@@ -163,11 +184,802 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         'imageSizes'   => $image_sources['sizes'],
                         'typeValues'   => $this->extract_type_values( $card, $config ),
                         'details'      => $this->prepare_card_details( $card, $set_name, $game, $type_slug ),
+                        'products'     => is_array( $product_matches ) ? array_values( $product_matches ) : array(),
                     );
                 }
             }
 
             return $cards;
+        }
+
+        /**
+         * Determine whether the given card should be included based on WooCommerce products.
+         *
+         * @param array  $card      Raw card payload.
+         * @param string $type_slug Current game slug.
+         *
+         * @return bool
+         */
+        protected function should_include_card( array $card, $type_slug, $matches = null ) {
+            $lookup = $this->get_product_card_lookup();
+
+            if ( null === $lookup ) {
+                return true;
+            }
+
+            if ( empty( $lookup ) ) {
+                return apply_filters( 'tcg_kiosk_should_include_card', false, $card, $type_slug, $lookup, array() );
+            }
+
+            if ( null === $matches ) {
+                $matches = $this->get_card_product_matches( $card, $type_slug );
+            }
+
+            if ( ! is_array( $matches ) ) {
+                $matches = array();
+            }
+
+            $include = ! empty( $matches );
+
+            return apply_filters( 'tcg_kiosk_should_include_card', $include, $card, $type_slug, $lookup, $matches );
+        }
+
+        /**
+         * Retrieve the WooCommerce product matches for a given card.
+         *
+         * @param array  $card      Raw card payload.
+         * @param string $type_slug Current game slug.
+         *
+         * @return array|null
+         */
+        protected function get_card_product_matches( array $card, $type_slug ) {
+            $lookup = $this->get_product_card_lookup();
+
+            if ( null === $lookup ) {
+                return null;
+            }
+
+            if ( empty( $lookup ) ) {
+                return array();
+            }
+
+            $candidates = $this->get_card_identifier_candidates( $card, $type_slug );
+
+            if ( empty( $candidates ) ) {
+                return array();
+            }
+
+            $matches = array();
+            $seen    = array();
+
+            foreach ( $candidates as $candidate ) {
+                $normalized = $this->normalize_card_identifier( $candidate );
+
+                if ( '' === $normalized || ! isset( $lookup[ $normalized ] ) || empty( $lookup[ $normalized ] ) ) {
+                    continue;
+                }
+
+                foreach ( $lookup[ $normalized ] as $entry ) {
+                    if ( empty( $entry ) || ! is_array( $entry ) ) {
+                        continue;
+                    }
+
+                    $product_id   = isset( $entry['productId'] ) ? (int) $entry['productId'] : 0;
+                    $variation_id = isset( $entry['variationId'] ) ? (int) $entry['variationId'] : 0;
+                    $unique_key   = $product_id . '|' . $variation_id;
+
+                    if ( isset( $seen[ $unique_key ] ) ) {
+                        $index = $seen[ $unique_key ];
+
+                        if ( isset( $matches[ $index ]['matchedIdentifiers'] ) && is_array( $matches[ $index ]['matchedIdentifiers'] ) ) {
+                            $matches[ $index ]['matchedIdentifiers'][] = $candidate;
+                            $matches[ $index ]['matchedIdentifiers']   = array_values( array_unique( array_filter( $matches[ $index ]['matchedIdentifiers'] ) ) );
+                        }
+
+                        continue;
+                    }
+
+                    $entry['matchedIdentifiers'] = isset( $entry['matchedIdentifiers'] ) && is_array( $entry['matchedIdentifiers'] )
+                        ? array_values( array_unique( array_filter( $entry['matchedIdentifiers'] ) ) )
+                        : array();
+
+                    $entry['matchedIdentifiers'][] = $candidate;
+                    $entry['matchedIdentifiers']   = array_values( array_unique( array_filter( $entry['matchedIdentifiers'] ) ) );
+
+                    $matches[]           = $entry;
+                    $seen[ $unique_key ] = count( $matches ) - 1;
+                }
+            }
+
+            return apply_filters( 'tcg_kiosk_card_product_matches', $matches, $card, $type_slug, $lookup, $candidates );
+        }
+
+        /**
+         * Retrieve a lookup of product-backed card identifiers.
+         *
+         * @return array|null
+         */
+        protected function get_product_card_lookup() {
+            if ( $this->product_card_lookup_ready ) {
+                return $this->product_card_lookup;
+            }
+
+            $this->product_card_lookup       = $this->build_product_card_lookup();
+            $this->product_card_lookup_ready = true;
+
+            return $this->product_card_lookup;
+        }
+
+        /**
+         * Build the WooCommerce-backed lookup of card identifiers.
+         *
+         * @return array|null
+         */
+        protected function build_product_card_lookup() {
+            if ( ! class_exists( 'WooCommerce' ) || ! function_exists( 'wc_get_products' ) ) {
+                return null;
+            }
+
+            $query_args = apply_filters(
+                'tcg_kiosk_product_query_args',
+                array(
+                    'limit'  => -1,
+                    'return' => 'ids',
+                    'status' => array( 'publish' ),
+                    'type'   => array( 'simple', 'variable', 'grouped', 'external' ),
+                )
+            );
+
+            $product_ids = wc_get_products( $query_args );
+
+            if ( empty( $product_ids ) ) {
+                return array();
+            }
+
+            $records = array();
+
+            foreach ( $product_ids as $product_id ) {
+                $product_records = $this->extract_identifiers_from_product( $product_id );
+
+                if ( empty( $product_records ) ) {
+                    continue;
+                }
+
+                $records = array_merge( $records, $product_records );
+            }
+
+            if ( empty( $records ) ) {
+                return array();
+            }
+
+            $identifiers = array();
+
+            foreach ( $records as $record ) {
+                if ( isset( $record['identifier'] ) ) {
+                    $identifiers[] = $record['identifier'];
+                }
+            }
+
+            $identifiers = apply_filters( 'tcg_kiosk_product_card_identifiers', $identifiers, $product_ids, $records );
+
+            $lookup = array();
+            $seen   = array();
+
+            foreach ( $records as $record ) {
+                if ( empty( $record['identifier'] ) || empty( $record['data'] ) || ! is_array( $record['data'] ) ) {
+                    continue;
+                }
+
+                $normalized = $this->normalize_card_identifier( $record['identifier'] );
+
+                if ( '' === $normalized ) {
+                    continue;
+                }
+
+                $product_id   = isset( $record['data']['productId'] ) ? (int) $record['data']['productId'] : ( isset( $record['product_id'] ) ? (int) $record['product_id'] : 0 );
+                $variation_id = isset( $record['data']['variationId'] ) ? (int) $record['data']['variationId'] : ( isset( $record['variation_id'] ) ? (int) $record['variation_id'] : 0 );
+
+                if ( ! isset( $record['data']['productId'] ) ) {
+                    $record['data']['productId'] = $product_id;
+                }
+
+                if ( ! isset( $record['data']['variationId'] ) ) {
+                    $record['data']['variationId'] = $variation_id;
+                }
+
+                if ( ! $product_id ) {
+                    continue;
+                }
+
+                if ( ! isset( $lookup[ $normalized ] ) ) {
+                    $lookup[ $normalized ] = array();
+                    $seen[ $normalized ]   = array();
+                }
+
+                $unique_key = $product_id . '|' . $variation_id;
+
+                if ( isset( $seen[ $normalized ][ $unique_key ] ) ) {
+                    $index = $seen[ $normalized ][ $unique_key ];
+
+                    if ( isset( $lookup[ $normalized ][ $index ]['matchedIdentifiers'] ) && is_array( $lookup[ $normalized ][ $index ]['matchedIdentifiers'] ) ) {
+                        $lookup[ $normalized ][ $index ]['matchedIdentifiers'][] = $record['identifier'];
+                        $lookup[ $normalized ][ $index ]['matchedIdentifiers']   = array_values( array_unique( array_filter( $lookup[ $normalized ][ $index ]['matchedIdentifiers'] ) ) );
+                    }
+
+                    continue;
+                }
+
+                $record['data']['matchedIdentifiers'] = array( $record['identifier'] );
+
+                $lookup[ $normalized ][]             = $record['data'];
+                $seen[ $normalized ][ $unique_key ] = count( $lookup[ $normalized ] ) - 1;
+            }
+
+            return apply_filters( 'tcg_kiosk_product_card_lookup', $lookup, $identifiers, $product_ids, $records );
+        }
+
+        /**
+         * Extract candidate identifiers from a WooCommerce product.
+         *
+         * @param int $product_id Product ID.
+         *
+         * @return array
+         */
+        protected function extract_identifiers_from_product( $product_id ) {
+            $records     = array();
+            $identifiers = array( $product_id );
+            $meta_keys   = apply_filters(
+                'tcg_kiosk_product_card_meta_keys',
+                array(
+                    '_tcg_card_id',
+                    '_tcg_card_ids',
+                    'tcg_card_id',
+                    'tcg_card_ids',
+                ),
+                $product_id
+            );
+
+            foreach ( $meta_keys as $meta_key ) {
+                $value = get_post_meta( $product_id, $meta_key, true );
+
+                if ( empty( $value ) && '0' !== $value ) {
+                    continue;
+                }
+
+                $identifiers = array_merge( $identifiers, $this->extract_identifier_values( $value ) );
+            }
+
+            $product = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : null;
+
+            if ( $product ) {
+                $sku = $product->get_sku();
+
+                if ( $sku ) {
+                    $identifiers[] = $sku;
+                }
+
+                $payload = $this->format_product_payload( $product );
+            } else {
+                $payload = $this->format_basic_product_payload( $product_id );
+            }
+
+            $identifiers = array_values( array_unique( array_filter( array_map( array( $this, 'sanitize_identifier_value' ), $identifiers ) ) ) );
+
+            foreach ( $identifiers as $identifier ) {
+                $records[] = array(
+                    'identifier'   => $identifier,
+                    'product_id'   => (int) $product_id,
+                    'variation_id' => 0,
+                    'data'         => $payload,
+                );
+            }
+
+            if ( $product && $product->is_type( 'variable' ) ) {
+                foreach ( $product->get_children() as $variation_id ) {
+                    $variation_records = $this->extract_identifiers_from_variation( $variation_id, $product );
+
+                    if ( ! empty( $variation_records ) ) {
+                        $records = array_merge( $records, $variation_records );
+                    }
+                }
+            }
+
+            return $records;
+        }
+
+        /**
+         * Extract candidate identifiers from a product variation.
+         *
+         * @param int $variation_id Variation post ID.
+         *
+         * @return array
+         */
+        protected function extract_identifiers_from_variation( $variation_id, $parent_product = null ) {
+            $records     = array();
+            $identifiers = array( $variation_id );
+            $meta_keys   = apply_filters(
+                'tcg_kiosk_variation_card_meta_keys',
+                array(
+                    '_tcg_card_id',
+                    '_tcg_card_ids',
+                    'tcg_card_id',
+                    'tcg_card_ids',
+                ),
+                $variation_id
+            );
+
+            foreach ( $meta_keys as $meta_key ) {
+                $value = get_post_meta( $variation_id, $meta_key, true );
+
+                if ( empty( $value ) && '0' !== $value ) {
+                    continue;
+                }
+
+                $identifiers = array_merge( $identifiers, $this->extract_identifier_values( $value ) );
+            }
+
+            $variation = function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ) : null;
+
+            if ( $variation ) {
+                $sku = $variation->get_sku();
+
+                if ( $sku ) {
+                    $identifiers[] = $sku;
+                }
+
+                $payload = $this->format_variation_payload( $variation, $parent_product );
+            } else {
+                $payload = $this->format_basic_variation_payload( $variation_id, $parent_product );
+            }
+
+            $identifiers = array_values( array_unique( array_filter( array_map( array( $this, 'sanitize_identifier_value' ), $identifiers ) ) ) );
+
+            $product_id = isset( $payload['productId'] ) ? (int) $payload['productId'] : ( $parent_product ? (int) $parent_product->get_id() : 0 );
+
+            foreach ( $identifiers as $identifier ) {
+                $records[] = array(
+                    'identifier'   => $identifier,
+                    'product_id'   => $product_id,
+                    'variation_id' => (int) $variation_id,
+                    'data'         => $payload,
+                );
+            }
+
+            return $records;
+        }
+
+        /**
+         * Flatten identifier values retrieved from post meta.
+         *
+         * @param mixed $value Raw value stored in post meta.
+         *
+         * @return array
+         */
+        protected function extract_identifier_values( $value ) {
+            if ( empty( $value ) && '0' !== $value ) {
+                return array();
+            }
+
+            if ( is_array( $value ) ) {
+                $values = array();
+
+                foreach ( $value as $entry ) {
+                    $values = array_merge( $values, $this->extract_identifier_values( $entry ) );
+                }
+
+                return $values;
+            }
+
+            if ( is_object( $value ) ) {
+                return $this->extract_identifier_values( (array) $value );
+            }
+
+            $string = trim( (string) $value );
+
+            if ( '' === $string ) {
+                return array();
+            }
+
+            $parts = preg_split( '/[\r\n,]+/', $string );
+
+            if ( false === $parts ) {
+                $parts = array( $string );
+            }
+
+            $results = array();
+
+            foreach ( $parts as $part ) {
+                $part = trim( $part );
+
+                if ( '' === $part ) {
+                    continue;
+                }
+
+                $results[] = $part;
+            }
+
+            return $results;
+        }
+
+        /**
+         * Prepare a product payload for the front-end consumer.
+         *
+         * @param WC_Product $product Product instance.
+         *
+         * @return array
+         */
+        protected function format_product_payload( $product ) {
+            $product_id = $product ? (int) $product->get_id() : 0;
+
+            return array(
+                'productId'        => $product_id,
+                'variationId'      => 0,
+                'parentId'         => $product_id,
+                'type'             => $this->sanitize_text_value( $product ? $product->get_type() : 'simple' ),
+                'name'             => $this->sanitize_text_value( $product ? $product->get_name() : '' ),
+                'sku'              => $this->sanitize_text_value( $product ? $product->get_sku() : '' ),
+                'priceHtml'        => $this->prepare_price_html( $product ? $product->get_price_html() : '' ),
+                'price'            => $this->prepare_price_value( $product ? $product->get_price() : '' ),
+                'regularPrice'     => $this->prepare_price_value( $product ? $product->get_regular_price() : '' ),
+                'salePrice'        => $this->prepare_price_value( $product ? $product->get_sale_price() : '' ),
+                'currencySymbol'   => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '',
+                'isPurchasable'    => $product ? (bool) $product->is_purchasable() : false,
+                'isInStock'        => $product ? (bool) $product->is_in_stock() : false,
+                'stockStatus'      => $this->sanitize_text_value( $product ? $product->get_stock_status() : '' ),
+                'stockQuantity'    => $product && null !== $product->get_stock_quantity() ? (int) $product->get_stock_quantity() : null,
+                'backordersAllowed'=> $product ? (bool) $product->backorders_allowed() : false,
+                'permalink'        => $this->sanitize_url_value( $product ? $product->get_permalink() : '' ),
+                'attributes'       => array(),
+                'attributeSummary' => '',
+            );
+        }
+
+        /**
+         * Prepare a fallback payload when a product instance is unavailable.
+         *
+         * @param int $product_id Product ID.
+         *
+         * @return array
+         */
+        protected function format_basic_product_payload( $product_id ) {
+            $name      = function_exists( 'get_the_title' ) ? get_the_title( $product_id ) : '';
+            $permalink = function_exists( 'get_permalink' ) ? get_permalink( $product_id ) : '';
+
+            return array(
+                'productId'        => (int) $product_id,
+                'variationId'      => 0,
+                'parentId'         => (int) $product_id,
+                'type'             => 'simple',
+                'name'             => $this->sanitize_text_value( $name ),
+                'sku'              => '',
+                'priceHtml'        => '',
+                'price'            => '',
+                'regularPrice'     => '',
+                'salePrice'        => '',
+                'currencySymbol'   => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '',
+                'isPurchasable'    => false,
+                'isInStock'        => false,
+                'stockStatus'      => '',
+                'stockQuantity'    => null,
+                'backordersAllowed'=> false,
+                'permalink'        => $this->sanitize_url_value( $permalink ),
+                'attributes'       => array(),
+                'attributeSummary' => '',
+            );
+        }
+
+        /**
+         * Prepare a variation payload for the front-end consumer.
+         *
+         * @param WC_Product_Variation $variation      Variation instance.
+         * @param WC_Product           $parent_product Parent product instance.
+         *
+         * @return array
+         */
+        protected function format_variation_payload( $variation, $parent_product = null ) {
+            $parent_id         = $variation ? (int) $variation->get_parent_id() : ( $parent_product ? (int) $parent_product->get_id() : 0 );
+            $attribute_summary = '';
+
+            if ( $variation ) {
+                if ( method_exists( $variation, 'get_attribute_summary' ) ) {
+                    $attribute_summary = $this->sanitize_text_value( $variation->get_attribute_summary() );
+                }
+
+                if ( '' === $attribute_summary && function_exists( 'wc_get_formatted_variation' ) ) {
+                    $formatted = wc_get_formatted_variation( $variation, true );
+
+                    if ( is_array( $formatted ) ) {
+                        $formatted = implode( ', ', $formatted );
+                    }
+
+                    if ( is_string( $formatted ) ) {
+                        $attribute_summary = $this->sanitize_text_value( $formatted );
+                    }
+                }
+            }
+
+            return array(
+                'productId'        => $parent_id,
+                'variationId'      => $variation ? (int) $variation->get_id() : 0,
+                'parentId'         => $parent_id,
+                'type'             => 'variation',
+                'name'             => $this->sanitize_text_value( $variation ? $variation->get_name() : '' ),
+                'sku'              => $this->sanitize_text_value( $variation ? $variation->get_sku() : '' ),
+                'priceHtml'        => $this->prepare_price_html( $variation ? $variation->get_price_html() : '' ),
+                'price'            => $this->prepare_price_value( $variation ? $variation->get_price() : '' ),
+                'regularPrice'     => $this->prepare_price_value( $variation ? $variation->get_regular_price() : '' ),
+                'salePrice'        => $this->prepare_price_value( $variation ? $variation->get_sale_price() : '' ),
+                'currencySymbol'   => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '',
+                'isPurchasable'    => $variation ? (bool) $variation->is_purchasable() : false,
+                'isInStock'        => $variation ? (bool) $variation->is_in_stock() : false,
+                'stockStatus'      => $this->sanitize_text_value( $variation ? $variation->get_stock_status() : '' ),
+                'stockQuantity'    => $variation && null !== $variation->get_stock_quantity() ? (int) $variation->get_stock_quantity() : null,
+                'backordersAllowed'=> $variation ? (bool) $variation->backorders_allowed() : false,
+                'permalink'        => $this->sanitize_url_value(
+                    $variation ? $variation->get_permalink() : ( $parent_product ? $parent_product->get_permalink() : '' )
+                ),
+                'attributes'       => $variation ? $this->prepare_variation_attributes( $variation->get_attributes() ) : array(),
+                'attributeSummary' => $attribute_summary,
+            );
+        }
+
+        /**
+         * Prepare a fallback payload when a variation instance is unavailable.
+         *
+         * @param int        $variation_id   Variation ID.
+         * @param WC_Product $parent_product Optional parent product instance.
+         *
+         * @return array
+         */
+        protected function format_basic_variation_payload( $variation_id, $parent_product = null ) {
+            $parent_id = $parent_product ? (int) $parent_product->get_id() : 0;
+
+            return array(
+                'productId'        => $parent_id,
+                'variationId'      => (int) $variation_id,
+                'parentId'         => $parent_id,
+                'type'             => 'variation',
+                'name'             => '',
+                'sku'              => '',
+                'priceHtml'        => '',
+                'price'            => '',
+                'regularPrice'     => '',
+                'salePrice'        => '',
+                'currencySymbol'   => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '',
+                'isPurchasable'    => false,
+                'isInStock'        => false,
+                'stockStatus'      => '',
+                'stockQuantity'    => null,
+                'backordersAllowed'=> false,
+                'permalink'        => $this->sanitize_url_value( $parent_product ? $parent_product->get_permalink() : '' ),
+                'attributes'       => array(),
+                'attributeSummary' => '',
+            );
+        }
+
+        /**
+         * Sanitise the HTML string returned by WooCommerce pricing helpers.
+         *
+         * @param string $price_html Raw price HTML.
+         *
+         * @return string
+         */
+        protected function prepare_price_html( $price_html ) {
+            if ( empty( $price_html ) || ! is_string( $price_html ) ) {
+                return '';
+            }
+
+            if ( function_exists( 'wp_kses_post' ) ) {
+                return wp_kses_post( $price_html );
+            }
+
+            return $price_html;
+        }
+
+        /**
+         * Normalise a numeric price value for JSON transport.
+         *
+         * @param mixed $price Raw price value.
+         *
+         * @return string
+         */
+        protected function prepare_price_value( $price ) {
+            if ( null === $price || '' === $price ) {
+                return '';
+            }
+
+            if ( is_numeric( $price ) ) {
+                if ( function_exists( 'wc_format_decimal' ) ) {
+                    return wc_format_decimal( $price );
+                }
+
+                return (string) ( $price + 0 );
+            }
+
+            return trim( (string) $price );
+        }
+
+        /**
+         * Prepare variation attributes for JSON transport.
+         *
+         * @param array $attributes Raw variation attributes.
+         *
+         * @return array
+         */
+        protected function prepare_variation_attributes( $attributes ) {
+            if ( empty( $attributes ) || ! is_array( $attributes ) ) {
+                return array();
+            }
+
+            $prepared = array();
+
+            foreach ( $attributes as $key => $value ) {
+                if ( ! is_string( $key ) && ! is_numeric( $key ) ) {
+                    continue;
+                }
+
+                $attribute_key = trim( (string) $key );
+
+                if ( '' === $attribute_key ) {
+                    continue;
+                }
+
+                if ( is_array( $value ) ) {
+                    $value = reset( $value );
+                }
+
+                $attribute_value = is_scalar( $value ) ? (string) $value : '';
+
+                if ( function_exists( 'wc_clean' ) ) {
+                    $attribute_value = wc_clean( $attribute_value );
+                } elseif ( function_exists( 'sanitize_text_field' ) ) {
+                    $attribute_value = sanitize_text_field( $attribute_value );
+                } else {
+                    $attribute_value = $this->sanitize_text_value( $attribute_value );
+                }
+
+                $prepared[ $attribute_key ] = $attribute_value;
+            }
+
+            return $prepared;
+        }
+
+        /**
+         * Sanitise a text value for inclusion in the JSON payload.
+         *
+         * @param mixed $value Raw value.
+         *
+         * @return string
+         */
+        protected function sanitize_text_value( $value ) {
+            if ( null === $value ) {
+                return '';
+            }
+
+            $string = (string) $value;
+
+            if ( function_exists( 'wp_strip_all_tags' ) ) {
+                $string = wp_strip_all_tags( $string );
+            } else {
+                $string = strip_tags( $string );
+            }
+
+            return trim( $string );
+        }
+
+        /**
+         * Sanitise an identifier value before lookup storage.
+         *
+         * @param mixed $value Raw identifier value.
+         *
+         * @return string
+         */
+        protected function sanitize_identifier_value( $value ) {
+            if ( is_numeric( $value ) || is_string( $value ) ) {
+                $string = trim( (string) $value );
+
+                if ( '' === $string ) {
+                    return '';
+                }
+
+                return $string;
+            }
+
+            return '';
+        }
+
+        /**
+         * Sanitise a URL value for inclusion in the payload.
+         *
+         * @param string $url Raw URL.
+         *
+         * @return string
+         */
+        protected function sanitize_url_value( $url ) {
+            if ( empty( $url ) ) {
+                return '';
+            }
+
+            $string = (string) $url;
+
+            if ( function_exists( 'esc_url_raw' ) ) {
+                return esc_url_raw( $string );
+            }
+
+            return $string;
+        }
+
+        /**
+         * Produce the set of identifier candidates for a given card.
+         *
+         * @param array  $card      Raw card payload.
+         * @param string $type_slug Current game slug.
+         *
+         * @return array
+         */
+        protected function get_card_identifier_candidates( array $card, $type_slug ) {
+            $candidates = array();
+
+            if ( isset( $card['id'] ) ) {
+                $candidates[] = $card['id'];
+            }
+
+            if ( isset( $card['number'] ) ) {
+                $number = trim( (string) $card['number'] );
+
+                if ( '' !== $number ) {
+                    if ( isset( $card['set'] ) && is_array( $card['set'] ) ) {
+                        if ( ! empty( $card['set']['id'] ) ) {
+                            $set_id = trim( (string) $card['set']['id'] );
+
+                            if ( '' !== $set_id ) {
+                                $candidates[] = $set_id . '-' . $number;
+                                $candidates[] = $set_id . $number;
+                            }
+                        }
+
+                        if ( ! empty( $card['set']['ptcgoCode'] ) ) {
+                            $ptcgo = trim( (string) $card['set']['ptcgoCode'] );
+
+                            if ( '' !== $ptcgo ) {
+                                $candidates[] = $ptcgo . '-' . $number;
+                                $candidates[] = $ptcgo . $number;
+                            }
+                        }
+                    }
+                }
+            }
+
+            $candidates = array_values( array_unique( array_filter( $candidates ) ) );
+
+            return apply_filters( 'tcg_kiosk_card_identifier_candidates', $candidates, $card, $type_slug );
+        }
+
+        /**
+         * Normalise an identifier for comparison.
+         *
+         * @param mixed $value Identifier candidate.
+         *
+         * @return string
+         */
+        protected function normalize_card_identifier( $value ) {
+            if ( ! is_string( $value ) && ! is_numeric( $value ) ) {
+                return '';
+            }
+
+            $string = trim( (string) $value );
+
+            if ( '' === $string ) {
+                return '';
+            }
+
+            $string = preg_replace( '/\s+/', '', $string );
+
+            if ( null === $string ) {
+                $string = trim( (string) $value );
+            }
+
+            return $this->to_lower( $string );
         }
 
         /**
@@ -182,46 +994,168 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
 
             if ( false !== strpos( $slug, 'pokemon' ) ) {
                 return array(
-                    'label'            => __( 'Type', 'tcg-kiosk-filter' ),
-                    'field'            => 'types',
-                    'options'          => array(),
-                    'match_mode'       => 'exact',
-                    'case_insensitive' => false,
+                    'label'              => __( 'Type', 'tcg-kiosk-filter' ),
+                    'field'              => 'types',
+                    'options'            => array(
+                        array(
+                            'value' => 'Colorless',
+                            'label' => __( 'Colorless', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Darkness',
+                            'label' => __( 'Darkness', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Dragon',
+                            'label' => __( 'Dragon', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Fairy',
+                            'label' => __( 'Fairy', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Fighting',
+                            'label' => __( 'Fighting', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Fire',
+                            'label' => __( 'Fire', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Grass',
+                            'label' => __( 'Grass', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Lightning',
+                            'label' => __( 'Lightning', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Metal',
+                            'label' => __( 'Metal', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Psychic',
+                            'label' => __( 'Psychic', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Water',
+                            'label' => __( 'Water', 'tcg-kiosk-filter' ),
+                            'row'   => 'primary',
+                        ),
+                        array(
+                            'value' => 'Pokémon Tool',
+                            'label' => __( 'Pokémon Tool', 'tcg-kiosk-filter' ),
+                            'row'   => 'trainer',
+                        ),
+                        array(
+                            'value' => 'Stadium',
+                            'label' => __( 'Stadium', 'tcg-kiosk-filter' ),
+                            'row'   => 'trainer',
+                        ),
+                        array(
+                            'value' => 'Supporter',
+                            'label' => __( 'Supporter', 'tcg-kiosk-filter' ),
+                            'row'   => 'trainer',
+                        ),
+                        array(
+                            'value' => 'Item',
+                            'label' => __( 'Item', 'tcg-kiosk-filter' ),
+                            'row'   => 'trainer',
+                        ),
+                    ),
+                    'include_all_option' => false,
+                    'match_mode'         => 'exact',
+                    'case_insensitive'   => false,
+                    'trainer_subtypes'   => array(
+                        'supporter'    => 'Supporter',
+                        'stadium'      => 'Stadium',
+                        'pokémon tool' => 'Pokémon Tool',
+                        'pokemon tool' => 'Pokémon Tool',
+                        'item'         => 'Item',
+                    ),
                 );
             }
 
             if ( false !== strpos( $slug, 'one-piece' ) ) {
                 return array(
-                    'label'            => __( 'Color', 'tcg-kiosk-filter' ),
-                    'field'            => 'color',
-                    'options'          => array(
+                    'label'              => __( 'Color', 'tcg-kiosk-filter' ),
+                    'field'              => array(
+                        'color',
                         array(
-                            'value' => 'black',
-                            'label' => __( 'Black', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'blue',
-                            'label' => __( 'Blue', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'green',
-                            'label' => __( 'Green', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'purple',
-                            'label' => __( 'Purple', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'red',
-                            'label' => __( 'Red', 'tcg-kiosk-filter' ),
-                        ),
-                        array(
-                            'value' => 'yellow',
-                            'label' => __( 'Yellow', 'tcg-kiosk-filter' ),
+                            'name' => 'type',
+                            'map'  => array(
+                                'leader'    => __( 'Leader', 'tcg-kiosk-filter' ),
+                                'character' => __( 'Character', 'tcg-kiosk-filter' ),
+                                'event'     => __( 'Event', 'tcg-kiosk-filter' ),
+                                'stage'     => __( 'Stage', 'tcg-kiosk-filter' ),
+                            ),
                         ),
                     ),
-                    'match_mode'       => 'contains',
-                    'case_insensitive' => true,
+                    'options'            => array(
+                        array(
+                            'value' => 'Black',
+                            'label' => __( 'Black', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Blue',
+                            'label' => __( 'Blue', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Green',
+                            'label' => __( 'Green', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Purple',
+                            'label' => __( 'Purple', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Red',
+                            'label' => __( 'Red', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Yellow',
+                            'label' => __( 'Yellow', 'tcg-kiosk-filter' ),
+                            'row'   => 'colors',
+                        ),
+                        array(
+                            'value' => 'Leader',
+                            'label' => __( 'Leader', 'tcg-kiosk-filter' ),
+                            'row'   => 'types',
+                        ),
+                        array(
+                            'value' => 'Character',
+                            'label' => __( 'Character', 'tcg-kiosk-filter' ),
+                            'row'   => 'types',
+                        ),
+                        array(
+                            'value' => 'Event',
+                            'label' => __( 'Event', 'tcg-kiosk-filter' ),
+                            'row'   => 'types',
+                        ),
+                        array(
+                            'value' => 'Stage',
+                            'label' => __( 'Stage', 'tcg-kiosk-filter' ),
+                            'row'   => 'types',
+                        ),
+                    ),
+                    'include_all_option' => false,
+                    'match_mode'         => 'contains',
+                    'case_insensitive'   => true,
                 );
             }
 
@@ -307,35 +1241,179 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          * @return array
          */
         protected function extract_type_values( array $card, array $config ) {
-            $values = array();
+            $values      = array();
+            $field_specs = array();
 
-            switch ( $config['field'] ) {
-                case 'types':
-                    if ( ! empty( $card['types'] ) && is_array( $card['types'] ) ) {
-                        $values = $card['types'];
-                    }
-                    break;
-                case 'color':
-                    if ( ! empty( $card['color'] ) ) {
-                        if ( is_array( $card['color'] ) ) {
-                            $values = $card['color'];
-                        } else {
-                            $values = array( $card['color'] );
+            if ( isset( $config['field'] ) && is_array( $config['field'] ) ) {
+                foreach ( $config['field'] as $field_entry ) {
+                    if ( is_array( $field_entry ) ) {
+                        $raw_name = isset( $field_entry['name'] ) ? $field_entry['name'] : '';
+
+                        if ( is_array( $raw_name ) || ( ! is_string( $raw_name ) && ! is_numeric( $raw_name ) ) ) {
+                            continue;
                         }
+
+                        $field_name = trim( preg_replace( '/\s+/', ' ', (string) $raw_name ) );
+
+                        if ( '' === $field_name ) {
+                            continue;
+                        }
+
+                        $map = array();
+
+                        if ( ! empty( $field_entry['map'] ) && is_array( $field_entry['map'] ) ) {
+                            foreach ( $field_entry['map'] as $map_key => $map_value ) {
+                                $raw_key = is_int( $map_key ) ? $map_value : $map_key;
+
+                                if ( is_array( $raw_key ) || ( ! is_string( $raw_key ) && ! is_numeric( $raw_key ) ) ) {
+                                    continue;
+                                }
+
+                                $clean_key = trim( preg_replace( '/\s+/', ' ', (string) $raw_key ) );
+
+                                if ( '' === $clean_key ) {
+                                    continue;
+                                }
+
+                                if ( is_array( $map_value ) ) {
+                                    continue;
+                                }
+
+                                $clean_value = ( is_string( $map_value ) || is_numeric( $map_value ) )
+                                    ? trim( preg_replace( '/\s+/', ' ', (string) $map_value ) )
+                                    : '';
+
+                                if ( '' === $clean_value ) {
+                                    $clean_value = $clean_key;
+                                }
+
+                                $map[ $this->to_lower( $clean_key ) ] = $clean_value;
+                            }
+                        }
+
+                        $field_specs[] = array(
+                            'name' => $field_name,
+                            'map'  => $map,
+                        );
+                    } elseif ( is_string( $field_entry ) || is_numeric( $field_entry ) ) {
+                        $field_name = trim( preg_replace( '/\s+/', ' ', (string) $field_entry ) );
+
+                        if ( '' === $field_name ) {
+                            continue;
+                        }
+
+                        $field_specs[] = array(
+                            'name' => $field_name,
+                            'map'  => array(),
+                        );
                     }
-                    break;
-                case 'domain':
-                    if ( ! empty( $card['domain'] ) ) {
-                        $values = array( $card['domain'] );
-                    }
-                    break;
+                }
+            } elseif ( isset( $config['field'] ) && ( is_string( $config['field'] ) || is_numeric( $config['field'] ) ) ) {
+                $field_name = trim( preg_replace( '/\s+/', ' ', (string) $config['field'] ) );
+
+                if ( '' !== $field_name ) {
+                    $field_specs[] = array(
+                        'name' => $field_name,
+                        'map'  => array(),
+                    );
+                }
             }
 
-            if ( empty( $values ) ) {
-                return array();
+            foreach ( $field_specs as $field_spec ) {
+                $field_name = $field_spec['name'];
+
+                if ( '' === $field_name || ! array_key_exists( $field_name, $card ) ) {
+                    continue;
+                }
+
+                $raw_value = $card[ $field_name ];
+
+                if ( is_array( $raw_value ) ) {
+                    $candidates = $raw_value;
+                } elseif ( null !== $raw_value ) {
+                    $candidates = array( $raw_value );
+                } else {
+                    $candidates = array();
+                }
+
+                foreach ( $candidates as $candidate ) {
+                    if ( ! is_string( $candidate ) && ! is_numeric( $candidate ) ) {
+                        continue;
+                    }
+
+                    $clean = trim( preg_replace( '/\s+/', ' ', (string) $candidate ) );
+
+                    if ( '' === $clean ) {
+                        continue;
+                    }
+
+                    if ( ! empty( $field_spec['map'] ) ) {
+                        $lookup = $this->to_lower( $clean );
+
+                        if ( isset( $field_spec['map'][ $lookup ] ) ) {
+                            $values[] = $field_spec['map'][ $lookup ];
+                            continue;
+                        }
+                    }
+
+                    $values[] = $clean;
+                }
             }
 
             $normalized = array();
+
+            if ( ! empty( $config['trainer_subtypes'] ) && ! empty( $card['subtypes'] ) && is_array( $card['subtypes'] ) ) {
+                $allowed_subtypes = array();
+
+                foreach ( $config['trainer_subtypes'] as $configured_key => $configured_label ) {
+                    $raw_key   = is_int( $configured_key ) ? $configured_label : $configured_key;
+                    $raw_label = $configured_label;
+
+                    if ( is_array( $raw_key ) || ( ! is_string( $raw_key ) && ! is_numeric( $raw_key ) ) ) {
+                        continue;
+                    }
+
+                    $clean_key = trim( preg_replace( '/\s+/', ' ', (string) $raw_key ) );
+
+                    if ( '' === $clean_key ) {
+                        continue;
+                    }
+
+                    if ( is_array( $raw_label ) ) {
+                        continue;
+                    }
+
+                    $clean_label = ( is_string( $raw_label ) || is_numeric( $raw_label ) )
+                        ? trim( preg_replace( '/\s+/', ' ', (string) $raw_label ) )
+                        : '';
+
+                    if ( '' === $clean_label ) {
+                        $clean_label = $clean_key;
+                    }
+
+                    $allowed_subtypes[ $this->to_lower( $clean_key ) ] = $clean_label;
+                }
+
+                if ( ! empty( $allowed_subtypes ) ) {
+                    foreach ( $card['subtypes'] as $subtype ) {
+                        if ( ! is_string( $subtype ) && ! is_numeric( $subtype ) ) {
+                            continue;
+                        }
+
+                        $clean_subtype = trim( preg_replace( '/\s+/', ' ', (string) $subtype ) );
+
+                        if ( '' === $clean_subtype ) {
+                            continue;
+                        }
+
+                        $key = $this->to_lower( $clean_subtype );
+
+                        if ( isset( $allowed_subtypes[ $key ] ) ) {
+                            $normalized[] = $allowed_subtypes[ $key ];
+                        }
+                    }
+                }
+            }
 
             foreach ( $values as $value ) {
                 if ( is_string( $value ) || is_numeric( $value ) ) {
