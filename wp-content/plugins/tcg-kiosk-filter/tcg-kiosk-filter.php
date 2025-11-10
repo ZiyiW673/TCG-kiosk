@@ -127,10 +127,6 @@ class TCG_Kiosk_Filter_Plugin {
             'water'     => 'water.png',
         );
 
-        $commerce_settings = array(
-            'addToCartNonce' => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( 'add-to-cart' ) : '',
-        );
-
         wp_localize_script(
             'tcg-kiosk-filter',
             'tcgKioskData',
@@ -141,7 +137,6 @@ class TCG_Kiosk_Filter_Plugin {
                     'baseUrl' => $type_icon_base_url,
                     'map'     => $type_icon_map,
                 ),
-                'commerce'     => $commerce_settings,
                 'i18n'         => array(
                     'allSets'  => __( 'All Sets', 'tcg-kiosk-filter' ),
                     'allTypeTemplate' => __( 'All %s', 'tcg-kiosk-filter' ),
@@ -379,21 +374,17 @@ header {
 }
 
 .tcg-kiosk__card-overlay-variant-select {
-    width: 100%;
-    max-width: 100%;
-    padding: 0.45rem 0.75rem;
+    padding: 0.35rem 0.5rem;
     border: 1px solid #c3c4c7;
     border-radius: 4px;
+    font-size: 0.95rem;
     background-color: #fff;
     color: #1d2327;
-    font-size: 0.95rem;
-    line-height: 1.4;
 }
 
-.tcg-kiosk__card-overlay-variant-select:focus {
-    border-color: #2271b1;
-    box-shadow: 0 0 0 1px #2271b1;
-    outline: none;
+.tcg-kiosk__card-overlay-variant-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .tcg-kiosk__card-overlay-add-to-cart {
@@ -961,111 +952,6 @@ CSS;
   const ONE_PIECE_COLOR_FOREGROUND = new Map( [
     [ 'yellow', '#1d2327' ],
   ] );
-  const commerceMessageParser = document.createElement( 'div' );
-
-  function getCommerceDebugMode() {
-    const value = window.tcgKioskDebugCommerce;
-
-    if ( 'string' === typeof value ) {
-      return value.trim().toLowerCase();
-    }
-
-    if ( value ) {
-      return 'log';
-    }
-
-    return '';
-  }
-
-  function isCommerceDebugging() {
-    const mode = getCommerceDebugMode();
-
-    return !! mode && 'off' !== mode;
-  }
-
-  function withCommerceDebug( callback ) {
-    if ( ! isCommerceDebugging() || 'function' !== typeof callback ) {
-      return;
-    }
-
-    try {
-      callback();
-    } catch ( error ) {
-      if ( window.console && window.console.error ) {
-        window.console.error( error );
-      }
-    }
-  }
-
-  function formatCommerceEntryForDebug( entry, index ) {
-    if ( ! entry || 'object' !== typeof entry ) {
-      return { index, note: 'invalid entry' };
-    }
-
-    const matched = Array.isArray( entry.matchedIdentifiers )
-      ? entry.matchedIdentifiers.join( ', ' )
-      : '';
-
-    return {
-      index,
-      type: entry.type || '',
-      productId: entry.productId || '',
-      variationId: entry.variationId || '',
-      sku: entry.sku || '',
-      isPurchasable: !! entry.isPurchasable,
-      isInStock: !! entry.isInStock,
-      backordersAllowed: !! entry.backordersAllowed,
-      stockStatus: entry.stockStatus || '',
-      price: entry.price || '',
-      matched,
-    };
-  }
-
-  function debugCommerceEntries( card, entries, context ) {
-    withCommerceDebug( () => {
-      if ( ! window.console ) {
-        return;
-      }
-
-      const consoleRef = window.console;
-      const cardName = card && card.name ? card.name : 'Unknown card';
-      const headingParts = [ '[TCG Kiosk] Commerce entries' ];
-
-      if ( context ) {
-        headingParts.push( '(' + context + ')' );
-      }
-
-      headingParts.push( '–', cardName );
-
-      const heading = headingParts.join( ' ' );
-
-      if ( consoleRef.groupCollapsed ) {
-        consoleRef.groupCollapsed( heading );
-      } else if ( consoleRef.group ) {
-        consoleRef.group( heading );
-      }
-
-      const payload = {
-        cardId: card && card.id ? card.id : null,
-        totalEntries: Array.isArray( entries ) ? entries.length : 0,
-        context,
-      };
-
-      if ( consoleRef.log ) {
-        consoleRef.log( payload );
-      }
-
-      if ( consoleRef.table && Array.isArray( entries ) ) {
-        consoleRef.table( entries.map( formatCommerceEntryForDebug ) );
-      } else if ( consoleRef.log && Array.isArray( entries ) ) {
-        consoleRef.log( entries.map( formatCommerceEntryForDebug ) );
-      }
-
-      if ( consoleRef.groupEnd ) {
-        consoleRef.groupEnd();
-      }
-    } );
-  }
 
   if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
@@ -1284,6 +1170,7 @@ CSS;
     currentCommerceEntries = [];
     currentCommerceSelectionIndex = -1;
     isAddingToCart = false;
+
     if ( cardOverlayCommerce ) {
       cardOverlayCommerce.hidden = true;
     }
@@ -1297,20 +1184,14 @@ CSS;
       cardOverlayVariantContainer.hidden = true;
     }
 
-    if ( cardOverlayVariantLabel && i18n.chooseVariant ) {
-      cardOverlayVariantLabel.textContent = i18n.chooseVariant;
-    }
-
     if ( cardOverlayVariantSelect ) {
       cardOverlayVariantSelect.innerHTML = '';
       cardOverlayVariantSelect.disabled = true;
-      cardOverlayVariantSelect.hidden = true;
-      const labelText = ( cardOverlayVariantLabel && cardOverlayVariantLabel.textContent ) || '';
-      if ( labelText ) {
-        cardOverlayVariantSelect.setAttribute( 'aria-label', labelText );
-      } else {
-        cardOverlayVariantSelect.removeAttribute( 'aria-label' );
-      }
+      cardOverlayVariantSelect.value = '';
+    }
+
+    if ( cardOverlayVariantLabel && i18n.chooseVariant ) {
+      cardOverlayVariantLabel.textContent = i18n.chooseVariant;
     }
 
     if ( cardOverlayAddToCart ) {
@@ -1385,56 +1266,6 @@ CSS;
     const backordersAllowed = !! entry.backordersAllowed;
 
     return purchasable && ( inStock || backordersAllowed );
-  }
-
-  function stripCommerceHtml( html ) {
-    if ( ! html || 'string' !== typeof html ) {
-      return '';
-    }
-
-    commerceMessageParser.innerHTML = html;
-    const text = commerceMessageParser.textContent || commerceMessageParser.innerText || '';
-    commerceMessageParser.innerHTML = '';
-
-    return text.trim();
-  }
-
-  function getAddToCartErrorMessage( responseData, entry ) {
-    const candidates = [];
-
-    if ( responseData && 'object' === typeof responseData ) {
-      if ( responseData.errorMessage && 'string' === typeof responseData.errorMessage ) {
-        candidates.push( responseData.errorMessage );
-      }
-
-      if ( responseData.message && 'string' === typeof responseData.message ) {
-        candidates.push( responseData.message );
-      }
-
-      if ( responseData.data ) {
-        if ( 'string' === typeof responseData.data ) {
-          candidates.push( responseData.data );
-        } else if ( responseData.data.message && 'string' === typeof responseData.data.message ) {
-          candidates.push( responseData.data.message );
-        }
-      }
-
-      if ( responseData.messages && 'string' === typeof responseData.messages ) {
-        candidates.push( stripCommerceHtml( responseData.messages ) );
-      }
-    }
-
-    const message = candidates.find( ( value ) => value && value.trim && value.trim() ) || '';
-
-    if ( message ) {
-      return message;
-    }
-
-    if ( entry && entry.type === 'variation' ) {
-      return i18n.selectProductOption || i18n.addToCartError || 'Unable to add this item to your cart.';
-    }
-
-    return i18n.addToCartError || 'Unable to add this item to your cart.';
   }
 
   function showCommerceMessage( message, status ) {
@@ -1522,17 +1353,8 @@ CSS;
     const entry = currentCommerceEntries[ nextIndex ] || null;
     currentCommerceSelectionIndex = nextIndex;
 
-    if ( cardOverlayVariantSelect && ! cardOverlayVariantSelect.disabled ) {
-      const targetValue = String( nextIndex );
-      const matchingOption = Array.from( cardOverlayVariantSelect.options || [] ).find(
-        ( option ) => option && option.value === targetValue
-      );
-
-      if ( matchingOption ) {
-        cardOverlayVariantSelect.value = targetValue;
-      } else {
-        cardOverlayVariantSelect.value = '';
-      }
+    if ( cardOverlayVariantSelect && cardOverlayVariantSelect.value !== String( nextIndex ) ) {
+      cardOverlayVariantSelect.value = String( nextIndex );
     }
 
     setPriceDisplay( entry );
@@ -1576,28 +1398,14 @@ CSS;
   function buildAddToCartPayload( entry ) {
     const params = new URLSearchParams();
 
-    const nonce =
-      ( window.wc_add_to_cart_params && window.wc_add_to_cart_params.add_to_cart_nonce ) ||
-      ( window.tcgKioskData && window.tcgKioskData.commerce && window.tcgKioskData.commerce.addToCartNonce ) ||
-      '';
-
     if ( ! entry ) {
       return params;
     }
 
-    if ( nonce ) {
-      params.set( 'security', nonce );
-    }
-
-    const parentId = entry.parentId || entry.productId || 0;
-    const productId = entry.productId || parentId || entry.variationId || 0;
+    const productId = entry.productId || entry.parentId || entry.variationId;
 
     if ( productId ) {
       params.set( 'product_id', String( productId ) );
-    }
-
-    if ( parentId || productId ) {
-      params.set( 'add-to-cart', String( parentId || productId ) );
     }
 
     if ( entry.variationId ) {
@@ -1668,8 +1476,6 @@ CSS;
     currentCommerceCard = card;
     currentCommerceEntries = entries;
 
-    debugCommerceEntries( card, entries, 'raw entries' );
-
     if ( cardOverlayCommerce ) {
       cardOverlayCommerce.hidden = false;
     }
@@ -1679,62 +1485,22 @@ CSS;
     }
 
     if ( cardOverlayVariantSelect ) {
+      cardOverlayVariantSelect.disabled = false;
       cardOverlayVariantSelect.innerHTML = '';
-      cardOverlayVariantSelect.disabled = true;
     }
 
-    if ( cardOverlayVariantContainer && cardOverlayVariantSelect ) {
-      const labelText =
-        ( cardOverlayVariantLabel && cardOverlayVariantLabel.textContent ) ||
-        i18n.chooseVariant ||
-        'Choose a version';
-
-      const indexedEntries = entries.map( ( entry, index ) => ( { entry, index } ) );
-
-      const purchasableEntries = indexedEntries.filter( ( payload ) => {
-        if ( ! payload || ! payload.entry ) {
-          return false;
-        }
-
-        return isEntryPurchasable( payload.entry );
-      } );
-
-      debugCommerceEntries(
-        card,
-        purchasableEntries.map( ( payload ) => payload.entry ),
-        'purchasable entries'
-      );
-
-      const optionEntries = purchasableEntries;
-
-      debugCommerceEntries(
-        card,
-        optionEntries.map( ( payload ) => payload.entry ),
-        'variant options'
-      );
-
-      if ( labelText ) {
-        cardOverlayVariantSelect.setAttribute( 'aria-label', labelText );
-      } else {
-        cardOverlayVariantSelect.removeAttribute( 'aria-label' );
-      }
-
-      optionEntries.forEach( ( payload ) => {
-        const { entry, index } = payload;
+    if ( entries.length > 1 && cardOverlayVariantContainer && cardOverlayVariantSelect ) {
+      entries.forEach( ( entry, index ) => {
         const option = document.createElement( 'option' );
         option.value = String( index );
         option.textContent = getEntryOptionLabel( entry, index );
-
+        option.disabled = ! isEntryPurchasable( entry );
         cardOverlayVariantSelect.appendChild( option );
       } );
 
-      cardOverlayVariantSelect.disabled = optionEntries.length <= 0;
-      cardOverlayVariantContainer.hidden = optionEntries.length <= 1;
-      cardOverlayVariantSelect.hidden = cardOverlayVariantContainer.hidden;
-
-      if ( optionEntries.length <= 1 ) {
-        debugCommerceEntries( card, entries, 'variant selector hidden' );
-      }
+      cardOverlayVariantContainer.hidden = false;
+    } else if ( cardOverlayVariantContainer ) {
+      cardOverlayVariantContainer.hidden = true;
     }
 
     let defaultIndex = entries.findIndex( ( entry ) => isEntryPurchasable( entry ) );
@@ -1782,8 +1548,12 @@ CSS;
       responseData = await response.json().catch( () => null );
 
       if ( responseData && responseData.error ) {
-        showCommerceMessage( getAddToCartErrorMessage( responseData, entry ), 'error' );
-        return;
+        if ( responseData.product_url ) {
+          window.location.href = responseData.product_url;
+          return;
+        }
+
+        throw new Error( 'Add to cart error' );
       }
 
       showCommerceMessage( formatAddedMessage( entry ), 'success' );
@@ -2662,17 +2432,8 @@ CSS;
   }
 
   if ( cardOverlayVariantSelect ) {
-    cardOverlayVariantSelect.addEventListener( 'change', ( event ) => {
-      if ( isAddingToCart ) {
-        if ( currentCommerceSelectionIndex >= 0 ) {
-          cardOverlayVariantSelect.value = String( currentCommerceSelectionIndex );
-        } else {
-          cardOverlayVariantSelect.value = '';
-        }
-        return;
-      }
-
-      updateCommerceSelection( event.target && 'value' in event.target ? event.target.value : '' );
+    cardOverlayVariantSelect.addEventListener( 'change', () => {
+      updateCommerceSelection( cardOverlayVariantSelect.value );
     } );
   }
 
@@ -2770,8 +2531,8 @@ JS;
                         <div id="tcg-kiosk-card-overlay-commerce" class="tcg-kiosk__card-overlay-commerce" hidden>
                             <div id="tcg-kiosk-card-overlay-price" class="tcg-kiosk__card-overlay-price"></div>
                             <div id="tcg-kiosk-card-overlay-variant" class="tcg-kiosk__card-overlay-variant" hidden>
-                                <p id="tcg-kiosk-card-overlay-variant-label" class="tcg-kiosk__card-overlay-variant-label"><?php esc_html_e( 'Choose a version', 'tcg-kiosk-filter' ); ?></p>
-                                <select id="tcg-kiosk-card-overlay-variant-select" class="tcg-kiosk__card-overlay-variant-select" hidden aria-labelledby="tcg-kiosk-card-overlay-variant-label"></select>
+                                <label for="tcg-kiosk-card-overlay-variant-select" id="tcg-kiosk-card-overlay-variant-label" class="tcg-kiosk__card-overlay-variant-label"><?php esc_html_e( 'Choose a version', 'tcg-kiosk-filter' ); ?></label>
+                                <select id="tcg-kiosk-card-overlay-variant-select" class="tcg-kiosk__card-overlay-variant-select"></select>
                             </div>
                             <button type="button" id="tcg-kiosk-card-overlay-add-to-cart" class="tcg-kiosk__card-overlay-add-to-cart" disabled><?php esc_html_e( 'Add to cart', 'tcg-kiosk-filter' ); ?></button>
                             <p id="tcg-kiosk-card-overlay-commerce-message" class="tcg-kiosk__card-overlay-commerce-message" role="status" aria-live="polite" hidden></p>
