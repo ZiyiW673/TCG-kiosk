@@ -961,7 +961,17 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $value = reset( $value );
                 }
 
-                $attribute_value = is_scalar( $value ) ? (string) $value : '';
+                $attribute_value = '';
+
+                if ( is_scalar( $value ) || ( is_object( $value ) && method_exists( $value, '__toString' ) ) ) {
+                    $attribute_value = (string) $value;
+                }
+
+                $attribute_value = trim( $attribute_value );
+
+                if ( '' === $attribute_value && '0' !== $attribute_value ) {
+                    continue;
+                }
 
                 if ( function_exists( 'wc_clean' ) ) {
                     $attribute_value = wc_clean( $attribute_value );
@@ -973,6 +983,14 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
 
                 $submission_key = $attribute_key;
 
+                if ( function_exists( 'wc_variation_attribute_name' ) ) {
+                    $normalized_name = wc_variation_attribute_name( $attribute_key );
+
+                    if ( is_string( $normalized_name ) && '' !== $normalized_name ) {
+                        $submission_key = $normalized_name;
+                    }
+                }
+
                 if ( 0 !== strpos( $submission_key, 'attribute_' ) ) {
                     $normalized_key = ltrim( $submission_key, '_' );
 
@@ -980,6 +998,24 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         $submission_key = 'attribute_' . $normalized_key;
                     } else {
                         $submission_key = 'attribute_' . $submission_key;
+                    }
+                }
+
+                $taxonomy_key = $submission_key;
+
+                if ( 0 === strpos( $taxonomy_key, 'attribute_' ) ) {
+                    $taxonomy_key = substr( $taxonomy_key, strlen( 'attribute_' ) );
+                }
+
+                $is_taxonomy_attribute = 0 === strpos( $taxonomy_key, 'pa_' );
+
+                if ( $is_taxonomy_attribute ) {
+                    if ( function_exists( 'wc_sanitize_taxonomy_name' ) ) {
+                        $attribute_value = wc_sanitize_taxonomy_name( $attribute_value );
+                    } elseif ( function_exists( 'sanitize_title' ) ) {
+                        $attribute_value = sanitize_title( $attribute_value );
+                    } else {
+                        $attribute_value = $this->sanitize_text_value( $attribute_value );
                     }
                 }
 
