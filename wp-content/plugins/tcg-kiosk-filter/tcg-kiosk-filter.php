@@ -1565,10 +1565,15 @@ CSS;
       return params;
     }
 
-    const productId = entry.productId || entry.parentId || entry.variationId;
+    const parentId = entry.parentId || entry.productId || 0;
+    const productId = entry.productId || parentId || entry.variationId || 0;
 
     if ( productId ) {
       params.set( 'product_id', String( productId ) );
+    }
+
+    if ( parentId || productId ) {
+      params.set( 'add-to-cart', String( parentId || productId ) );
     }
 
     if ( entry.variationId ) {
