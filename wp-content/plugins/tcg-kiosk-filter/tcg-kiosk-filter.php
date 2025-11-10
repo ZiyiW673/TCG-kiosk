@@ -1630,32 +1630,49 @@ CSS;
       params.set( 'security', nonce );
     }
 
-    const parentId = entry.parentId || entry.productId || 0;
-    const productId = entry.productId || parentId || entry.variationId || 0;
+    const parentId = parseInt( entry.parentId || 0, 10 ) || 0;
+    const rawProductId = parseInt( entry.productId || 0, 10 ) || 0;
+    const variationId = parseInt( entry.variationId || 0, 10 ) || 0;
+
+    const addToCartId = parentId || rawProductId || variationId;
+    const productId = rawProductId || parentId || variationId;
 
     if ( productId ) {
       params.set( 'product_id', String( productId ) );
     }
 
-    if ( parentId || productId ) {
-      params.set( 'add-to-cart', String( parentId || productId ) );
+    if ( addToCartId ) {
+      params.set( 'add-to-cart', String( addToCartId ) );
     }
 
-    if ( entry.variationId ) {
-      params.set( 'variation_id', String( entry.variationId ) );
+    if ( variationId ) {
+      params.set( 'variation_id', String( variationId ) );
     }
 
-    params.set( 'quantity', '1' );
+    params.set( 'quantity', entry.quantity ? String( entry.quantity ) : '1' );
 
     if ( entry.attributes && 'object' === typeof entry.attributes ) {
       Object.keys( entry.attributes ).forEach( ( key ) => {
-        const value = entry.attributes[ key ];
-
-        if ( ! key || ! value ) {
+        if ( ! key ) {
           return;
         }
 
-        params.set( key, value );
+        const value = entry.attributes[ key ];
+
+        if ( value === undefined || value === null || ( '' === value && '0' !== value ) ) {
+          return;
+        }
+
+        const stringKey = String( key ).trim();
+
+        if ( ! stringKey ) {
+          return;
+        }
+
+        const stringValue = String( value );
+
+        params.set( stringKey, stringValue );
+        params.set( `variation[${ stringKey }]`, stringValue );
       } );
     }
 
