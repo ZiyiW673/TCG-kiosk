@@ -127,6 +127,10 @@ class TCG_Kiosk_Filter_Plugin {
             'water'     => 'water.png',
         );
 
+        $commerce_settings = array(
+            'addToCartNonce' => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( 'add-to-cart' ) : '',
+        );
+
         wp_localize_script(
             'tcg-kiosk-filter',
             'tcgKioskData',
@@ -137,6 +141,7 @@ class TCG_Kiosk_Filter_Plugin {
                     'baseUrl' => $type_icon_base_url,
                     'map'     => $type_icon_map,
                 ),
+                'commerce'     => $commerce_settings,
                 'i18n'         => array(
                     'allSets'  => __( 'All Sets', 'tcg-kiosk-filter' ),
                     'allTypeTemplate' => __( 'All %s', 'tcg-kiosk-filter' ),
@@ -1561,8 +1566,17 @@ CSS;
   function buildAddToCartPayload( entry ) {
     const params = new URLSearchParams();
 
+    const nonce =
+      ( window.wc_add_to_cart_params && window.wc_add_to_cart_params.add_to_cart_nonce ) ||
+      ( window.tcgKioskData && window.tcgKioskData.commerce && window.tcgKioskData.commerce.addToCartNonce ) ||
+      '';
+
     if ( ! entry ) {
       return params;
+    }
+
+    if ( nonce ) {
+      params.set( 'security', nonce );
     }
 
     const parentId = entry.parentId || entry.productId || 0;
