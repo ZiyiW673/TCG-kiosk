@@ -986,6 +986,7 @@ CSS;
   const ONE_PIECE_COLOR_FOREGROUND = new Map( [
     [ 'yellow', '#1d2327' ],
   ] );
+  const commerceMessageParser = document.createElement( 'div' );
 
   function getCommerceDebugMode() {
     const value = window.tcgKioskDebugCommerce;
@@ -1421,6 +1422,56 @@ CSS;
     const backordersAllowed = !! entry.backordersAllowed;
 
     return purchasable && ( inStock || backordersAllowed );
+  }
+
+  function stripCommerceHtml( html ) {
+    if ( ! html || 'string' !== typeof html ) {
+      return '';
+    }
+
+    commerceMessageParser.innerHTML = html;
+    const text = commerceMessageParser.textContent || commerceMessageParser.innerText || '';
+    commerceMessageParser.innerHTML = '';
+
+    return text.trim();
+  }
+
+  function getAddToCartErrorMessage( responseData, entry ) {
+    const candidates = [];
+
+    if ( responseData && 'object' === typeof responseData ) {
+      if ( responseData.errorMessage && 'string' === typeof responseData.errorMessage ) {
+        candidates.push( responseData.errorMessage );
+      }
+
+      if ( responseData.message && 'string' === typeof responseData.message ) {
+        candidates.push( responseData.message );
+      }
+
+      if ( responseData.data ) {
+        if ( 'string' === typeof responseData.data ) {
+          candidates.push( responseData.data );
+        } else if ( responseData.data.message && 'string' === typeof responseData.data.message ) {
+          candidates.push( responseData.data.message );
+        }
+      }
+
+      if ( responseData.messages && 'string' === typeof responseData.messages ) {
+        candidates.push( stripCommerceHtml( responseData.messages ) );
+      }
+    }
+
+    const message = candidates.find( ( value ) => value && value.trim && value.trim() ) || '';
+
+    if ( message ) {
+      return message;
+    }
+
+    if ( entry && entry.type === 'variation' ) {
+      return i18n.selectProductOption || i18n.addToCartError || 'Unable to add this item to your cart.';
+    }
+
+    return i18n.addToCartError || 'Unable to add this item to your cart.';
   }
 
   function showCommerceMessage( message, status ) {
@@ -1877,12 +1928,8 @@ CSS;
       responseData = await response.json().catch( () => null );
 
       if ( responseData && responseData.error ) {
-        if ( responseData.product_url ) {
-          window.location.href = responseData.product_url;
-          return;
-        }
-
-        throw new Error( 'Add to cart error' );
+        showCommerceMessage( getAddToCartErrorMessage( responseData, entry ), 'error' );
+        return;
       }
 
       showCommerceMessage( formatAddedMessage( entry ), 'success' );
