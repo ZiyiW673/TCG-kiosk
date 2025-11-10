@@ -291,7 +291,126 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 }
             }
 
+            if ( ! empty( $matches ) ) {
+                $matches = $this->expand_variable_product_matches( $matches );
+            }
+
             return apply_filters( 'tcg_kiosk_card_product_matches', $matches, $card, $type_slug, $lookup, $candidates );
+        }
+
+        /**
+         * Ensure variable products expose their purchasable variations to the front end.
+         *
+         * @param array $matches Matched product payloads.
+         *
+         * @return array
+         */
+        protected function expand_variable_product_matches( array $matches ) {
+            if ( empty( $matches ) ) {
+                return $matches;
+            }
+
+            $expanded = array();
+            $seen      = array();
+
+            foreach ( $matches as $match ) {
+                if ( empty( $match ) || ! is_array( $match ) ) {
+                    continue;
+                }
+
+                $product_id   = isset( $match['productId'] ) ? (int) $match['productId'] : 0;
+                $variation_id = isset( $match['variationId'] ) ? (int) $match['variationId'] : 0;
+                $unique_key   = $product_id . '|' . $variation_id;
+
+                if ( isset( $seen[ $unique_key ] ) ) {
+                    $index = $seen[ $unique_key ];
+
+                    if ( isset( $expanded[ $index ]['matchedIdentifiers'] ) && isset( $match['matchedIdentifiers'] ) ) {
+                        $expanded[ $index ]['matchedIdentifiers'] = array_values(
+                            array_unique(
+                                array_merge(
+                                    (array) $expanded[ $index ]['matchedIdentifiers'],
+                                    (array) $match['matchedIdentifiers']
+                                )
+                            )
+                        );
+                    }
+
+                    continue;
+                }
+
+                $expanded[]              = $match;
+                $seen[ $unique_key ]     = count( $expanded ) - 1;
+            }
+
+            foreach ( $expanded as $match ) {
+                $product_id   = isset( $match['productId'] ) ? (int) $match['productId'] : 0;
+                $variation_id = isset( $match['variationId'] ) ? (int) $match['variationId'] : 0;
+
+                if ( $variation_id > 0 || $product_id <= 0 ) {
+                    continue;
+                }
+
+                $type = isset( $match['type'] ) ? strtolower( (string) $match['type'] ) : '';
+
+                if ( 'variable' !== $type ) {
+                    continue;
+                }
+
+                if ( ! function_exists( 'wc_get_product' ) ) {
+                    continue;
+                }
+
+                $product = wc_get_product( $product_id );
+
+                if ( ! $product || ! $product->is_type( 'variable' ) ) {
+                    continue;
+                }
+
+                $matched_identifiers = isset( $match['matchedIdentifiers'] ) && is_array( $match['matchedIdentifiers'] )
+                    ? array_values( array_unique( array_filter( $match['matchedIdentifiers'] ) ) )
+                    : array();
+
+                foreach ( $product->get_children() as $child_id ) {
+                    $child_id = (int) $child_id;
+
+                    if ( $child_id <= 0 ) {
+                        continue;
+                    }
+
+                    $unique_key = $product_id . '|' . $child_id;
+
+                    if ( isset( $seen[ $unique_key ] ) ) {
+                        $index = $seen[ $unique_key ];
+
+                        if ( isset( $expanded[ $index ]['matchedIdentifiers'] ) ) {
+                            $expanded[ $index ]['matchedIdentifiers'] = array_values( array_unique( array_merge(
+                                (array) $expanded[ $index ]['matchedIdentifiers'],
+                                $matched_identifiers
+                            ) ) );
+                        } else {
+                            $expanded[ $index ]['matchedIdentifiers'] = $matched_identifiers;
+                        }
+
+                        continue;
+                    }
+
+                    $variation = wc_get_product( $child_id );
+
+                    if ( $variation ) {
+                        $payload = $this->format_variation_payload( $variation, $product );
+                    } else {
+                        $payload = $this->format_basic_variation_payload( $child_id, $product );
+                    }
+
+                    $payload['matchedIdentifiers'] = $matched_identifiers;
+
+                    $expanded[]          = $payload;
+                    $seen[ $unique_key ] = count( $expanded ) - 1;
+                }
+            }
+
+            return $expanded;
         }
 
         /**
