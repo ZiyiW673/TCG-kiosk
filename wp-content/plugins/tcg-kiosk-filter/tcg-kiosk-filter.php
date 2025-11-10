@@ -1494,6 +1494,26 @@ CSS;
     return `attribute_pa_${ normalizedKey.replace( /^_+/, '' ) }`;
   }
 
+  function resolveVariationSource( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return null;
+    }
+
+    if ( entry.selectedVariation && 'object' === typeof entry.selectedVariation ) {
+      return entry.selectedVariation;
+    }
+
+    if ( entry.variation && 'object' === typeof entry.variation ) {
+      return entry.variation;
+    }
+
+    if ( entry.type === 'variation' ) {
+      return entry;
+    }
+
+    return null;
+  }
+
   function buildAddToCartPayload( entry, options ) {
     const params = new URLSearchParams();
 
@@ -1502,15 +1522,27 @@ CSS;
     }
 
     const includeAddToCartParam = options && options.includeAddToCartParam;
-    const isVariation = entry.type === 'variation';
+
+    const variationSource = resolveVariationSource( entry );
+    const isVariation = !! variationSource;
     const parentId =
       entry.parentId ||
       entry.parent_id ||
-      ( isVariation ? Number.parseInt( entry.product_id, 10 ) || 0 : 0 );
+      ( isVariation
+        ? Number.parseInt(
+            variationSource.parent_id ||
+              variationSource.product_id ||
+              entry.product_id ||
+              0,
+            10
+          ) || 0
+        : 0 );
     const productId =
       entry.productId ||
-      ( isVariation ? parentId : Number.parseInt( entry.id, 10 ) || 0 );
-    const variationId = getEntryVariationId( entry );
+      ( isVariation
+        ? parentId
+        : Number.parseInt( entry.id || entry.product_id || 0, 10 ) || 0 );
+    const variationId = getEntryVariationId( variationSource || entry );
 
     if ( productId ) {
       params.set( 'product_id', String( productId ) );
@@ -1531,8 +1563,14 @@ CSS;
     const quantity = Number.parseInt( entry.quantity, 10 );
     params.set( 'quantity', String( Number.isInteger( quantity ) && quantity > 0 ? quantity : 1 ) );
 
-    if ( entry.attributes && 'object' === typeof entry.attributes ) {
-      Object.entries( entry.attributes ).forEach( ( [ key, value ] ) => {
+    const attributes =
+      ( variationSource && variationSource.attributes ) ||
+      entry.selectedAttributes ||
+      entry.attributes ||
+      {};
+
+    if ( attributes && 'object' === typeof attributes ) {
+      Object.entries( attributes ).forEach( ( [ key, value ] ) => {
         const rawKey = String( key );
         const trimmedKey = rawKey.trim();
         const normalizedValue = String( value || '' ).trim();
@@ -1670,6 +1708,17 @@ CSS;
     let responseData = null;
 
     try {
+      console.log(
+        '[Kiosk AddToCart] Endpoint:',
+        endpoint,
+        '\n[Kiosk AddToCart] Payload:',
+        payload instanceof URLSearchParams ? payload.toString() : payload
+      );
+    } catch ( logError ) {
+      console.log( '[Kiosk AddToCart] Payload log error:', logError );
+    }
+
+    try {
       const response = await fetch( endpoint, {
         method: 'POST',
         headers: {
@@ -1686,7 +1735,7 @@ CSS;
 
       responseData = await response.json().catch( () => null );
 
-      if ( responseData && responseData.error ) {
+      if ( responseData && ( responseData.error || responseData.success === false ) ) {
         const message = extractErrorMessage( responseData );
 
         if ( message ) {
@@ -1694,7 +1743,11 @@ CSS;
           return;
         }
 
-        showCommerceMessage( i18n.addToCartError || 'Unable to add this item to your cart.', 'error' );
+        showCommerceMessage(
+          ( 'undefined' !== typeof i18n && i18n.addToCartError ) ||
+            'Unable to add this item to your cart.',
+          'error'
+        );
         return;
       }
 
@@ -1725,7 +1778,11 @@ CSS;
       console.error( error );
 
       if ( ! responseData || ! responseData.error ) {
-        showCommerceMessage( i18n.addToCartError || 'Unable to add this item to your cart.', 'error' );
+        showCommerceMessage(
+          ( 'undefined' !== typeof i18n && i18n.addToCartError ) ||
+            'Unable to add this item to your cart.',
+          'error'
+        );
       }
     } finally {
       updateAddToCartLoading( false );
@@ -1733,23 +1790,38 @@ CSS;
     }
   }
 
-  function extractErrorMessage( responseData ) {
-    if ( ! responseData ) {
+  function extractErrorMessage( response ) {
+    if ( ! response ) {
       return '';
     }
 
-    if ( responseData.messages && 'string' === typeof responseData.messages ) {
-      const container = document.createElement( 'div' );
-      container.innerHTML = responseData.messages;
-      const text = container.textContent || container.innerText || '';
+    if ( response.messages && 'string' === typeof response.messages ) {
+      const text = response.messages
+        .replace( /<style[\s\S]*?<\/style>/gi, ' ' )
+        .replace( /<script[\s\S]*?<\/script>/gi, ' ' )
+        .replace( /<[^>]+>/g, ' ' )
+        .replace( /\s+/g, ' ' )
+        .trim();
 
       if ( text ) {
-        return text.replace( /\s+/g, ' ' ).trim();
+        return text;
       }
     }
 
-    if ( responseData.error && responseData.message ) {
-      return String( responseData.message );
+    if ( response.data && 'string' === typeof response.data.message ) {
+      const nestedMessage = response.data.message.trim();
+
+      if ( nestedMessage ) {
+        return nestedMessage;
+      }
+    }
+
+    if ( 'string' === typeof response.message ) {
+      const flatMessage = response.message.trim();
+
+      if ( flatMessage ) {
+        return flatMessage;
+      }
     }
 
     return '';
