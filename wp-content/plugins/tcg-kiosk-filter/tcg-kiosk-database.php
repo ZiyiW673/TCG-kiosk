@@ -300,12 +300,19 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          * @return array|null
          */
         protected function get_product_card_lookup() {
-            if ( $this->product_card_lookup_ready ) {
+            if ( $this->product_card_lookup_ready && null !== $this->product_card_lookup ) {
                 return $this->product_card_lookup;
             }
 
-            $this->product_card_lookup       = $this->build_product_card_lookup();
-            $this->product_card_lookup_ready = true;
+            $lookup = $this->build_product_card_lookup();
+
+            if ( null !== $lookup ) {
+                $this->product_card_lookup       = $lookup;
+                $this->product_card_lookup_ready = true;
+            } else {
+                $this->product_card_lookup       = null;
+                $this->product_card_lookup_ready = false;
+            }
 
             return $this->product_card_lookup;
         }
@@ -316,7 +323,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          * @return array|null
          */
         protected function build_product_card_lookup() {
-            if ( ! class_exists( 'WooCommerce' ) || ! function_exists( 'wc_get_products' ) ) {
+            if ( ! function_exists( 'wc_get_products' ) ) {
                 return null;
             }
 
