@@ -798,6 +798,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
         protected function format_variation_payload( $variation, $parent_product = null ) {
             $parent_id         = $variation ? (int) $variation->get_parent_id() : ( $parent_product ? (int) $parent_product->get_id() : 0 );
             $attribute_summary = '';
+            $attribute_source  = array();
 
             if ( $variation ) {
                 if ( method_exists( $variation, 'get_attribute_summary' ) ) {
@@ -814,6 +815,14 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     if ( is_string( $formatted ) ) {
                         $attribute_summary = $this->sanitize_text_value( $formatted );
                     }
+                }
+
+                if ( function_exists( 'wc_get_product_variation_attributes' ) ) {
+                    $attribute_source = wc_get_product_variation_attributes( $variation->get_id() );
+                }
+
+                if ( empty( $attribute_source ) ) {
+                    $attribute_source = $variation->get_attributes();
                 }
             }
 
@@ -837,7 +846,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'permalink'        => $this->sanitize_url_value(
                     $variation ? $variation->get_permalink() : ( $parent_product ? $parent_product->get_permalink() : '' )
                 ),
-                'attributes'       => $variation ? $this->prepare_variation_attributes( $variation->get_attributes() ) : array(),
+                'attributes'       => $this->prepare_variation_attributes( $attribute_source ),
                 'attributeSummary' => $attribute_summary,
             );
         }
@@ -852,6 +861,11 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          */
         protected function format_basic_variation_payload( $variation_id, $parent_product = null ) {
             $parent_id = $parent_product ? (int) $parent_product->get_id() : 0;
+            $attributes = array();
+
+            if ( $variation_id && function_exists( 'wc_get_product_variation_attributes' ) ) {
+                $attributes = wc_get_product_variation_attributes( $variation_id );
+            }
 
             return array(
                 'productId'        => $parent_id,
@@ -871,7 +885,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'stockQuantity'    => null,
                 'backordersAllowed'=> false,
                 'permalink'        => $this->sanitize_url_value( $parent_product ? $parent_product->get_permalink() : '' ),
-                'attributes'       => array(),
+                'attributes'       => $this->prepare_variation_attributes( $attributes ),
                 'attributeSummary' => '',
             );
         }
