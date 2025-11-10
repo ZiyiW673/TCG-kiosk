@@ -1472,6 +1472,28 @@ CSS;
     return 0;
   }
 
+  function normalizeAttributeKey( key ) {
+    if ( ! key ) {
+      return '';
+    }
+
+    const normalizedKey = String( key ).trim();
+
+    if ( ! normalizedKey ) {
+      return '';
+    }
+
+    if ( normalizedKey.startsWith( 'attribute_' ) ) {
+      return normalizedKey;
+    }
+
+    if ( normalizedKey.startsWith( 'pa_' ) ) {
+      return `attribute_${ normalizedKey }`;
+    }
+
+    return `attribute_pa_${ normalizedKey.replace( /^_+/, '' ) }`;
+  }
+
   function buildAddToCartPayload( entry, options ) {
     const params = new URLSearchParams();
 
@@ -1482,8 +1504,12 @@ CSS;
     const includeAddToCartParam = options && options.includeAddToCartParam;
     const isVariation = entry.type === 'variation';
     const parentId =
-      entry.parentId || entry.parent_id || ( isVariation ? Number.parseInt( entry.product_id, 10 ) || 0 : 0 );
-    const productId = entry.productId || ( isVariation ? parentId : Number.parseInt( entry.id, 10 ) || 0 );
+      entry.parentId ||
+      entry.parent_id ||
+      ( isVariation ? Number.parseInt( entry.product_id, 10 ) || 0 : 0 );
+    const productId =
+      entry.productId ||
+      ( isVariation ? parentId : Number.parseInt( entry.id, 10 ) || 0 );
     const variationId = getEntryVariationId( entry );
 
     if ( productId ) {
@@ -1507,41 +1533,37 @@ CSS;
 
     if ( entry.attributes && 'object' === typeof entry.attributes ) {
       Object.entries( entry.attributes ).forEach( ( [ key, value ] ) => {
-        const normalizedKey = normalizeAttributeKey( key );
+        const rawKey = String( key );
+        const trimmedKey = rawKey.trim();
         const normalizedValue = String( value || '' ).trim();
 
-        if ( ! normalizedKey || ! normalizedValue ) {
+        if ( ! normalizedValue ) {
           return;
         }
 
-        params.set( normalizedKey, normalizedValue );
-        params.set( `variation[${ normalizedKey }]`, normalizedValue );
+        const normalizedKey = normalizeAttributeKey( trimmedKey );
+
+        if ( normalizedKey ) {
+          params.set( normalizedKey, normalizedValue );
+          params.set( `variation[${ normalizedKey }]`, normalizedValue );
+        }
+
+        if (
+          trimmedKey &&
+          ! trimmedKey.startsWith( 'attribute_' ) &&
+          ! trimmedKey.startsWith( 'pa_' )
+        ) {
+          const localKey = `attribute_${ trimmedKey.replace( /^_+/, '' ) }`;
+
+          if ( localKey && localKey !== normalizedKey ) {
+            params.set( localKey, normalizedValue );
+            params.set( `variation[${ localKey }]`, normalizedValue );
+          }
+        }
       } );
     }
 
     return params;
-  }
-
-  function normalizeAttributeKey( key ) {
-    if ( ! key ) {
-      return '';
-    }
-
-    let normalizedKey = String( key ).trim();
-
-    if ( ! normalizedKey ) {
-      return '';
-    }
-
-    if ( normalizedKey.startsWith( 'attribute_' ) ) {
-      return normalizedKey;
-    }
-
-    if ( normalizedKey.startsWith( 'pa_' ) ) {
-      return `attribute_${ normalizedKey }`;
-    }
-
-    return `attribute_pa_${ normalizedKey.replace( /^_+/, '' ) }`;
   }
 
   function updateAddToCartLoading( loading ) {
@@ -1672,12 +1694,8 @@ CSS;
           return;
         }
 
-        if ( responseData.product_url ) {
-          window.location.href = responseData.product_url;
-          return;
-        }
-
-        throw new Error( 'Add to cart error' );
+        showCommerceMessage( i18n.addToCartError || 'Unable to add this item to your cart.', 'error' );
+        return;
       }
 
       showCommerceMessage( formatAddedMessage( entry ), 'success' );
