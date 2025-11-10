@@ -1436,6 +1436,117 @@ CSS;
     return text.trim();
   }
 
+  function responseContainsWooCommerceError( responseData ) {
+    if ( ! responseData || 'object' !== typeof responseData ) {
+      return false;
+    }
+
+    const { messages } = responseData;
+
+    if ( ! messages || 'string' !== typeof messages ) {
+      return false;
+    }
+
+    commerceMessageParser.innerHTML = messages;
+
+    const hasErrorNotice =
+      !! commerceMessageParser.querySelector &&
+      !! commerceMessageParser.querySelector( '.woocommerce-error, .woocommerce-message--error' );
+
+    commerceMessageParser.innerHTML = '';
+
+    return hasErrorNotice;
+  }
+
+  function normalizeResponseFlag( value ) {
+    if ( null === value || undefined === value ) {
+      return null;
+    }
+
+    if ( true === value || false === value ) {
+      return value;
+    }
+
+    if ( 'number' === typeof value ) {
+      return value !== 0;
+    }
+
+    if ( 'string' === typeof value ) {
+      const normalized = value.trim().toLowerCase();
+
+      if ( ! normalized ) {
+        return false;
+      }
+
+      if ( [ 'true', '1', 'yes', 'y', 'error', 'errors' ].includes( normalized ) ) {
+        return true;
+      }
+
+      if ( [ 'false', '0', 'no', 'n', 'success', 'passed' ].includes( normalized ) ) {
+        return false;
+      }
+    }
+
+    return null;
+  }
+
+  function responseIncludesCartData( responseData ) {
+    if ( ! responseData || 'object' !== typeof responseData ) {
+      return false;
+    }
+
+    const hasFragments =
+      responseData.fragments &&
+      'object' === typeof responseData.fragments &&
+      Object.keys( responseData.fragments ).length > 0;
+
+    const hasCartHash =
+      ( 'string' === typeof responseData.cart_hash && responseData.cart_hash.trim() ) ||
+      ( 'number' === typeof responseData.cart_hash && ! Number.isNaN( responseData.cart_hash ) );
+
+    return !! ( hasFragments || hasCartHash );
+  }
+
+  function responseIndicatesAddToCartError( responseData ) {
+    if ( ! responseData || 'object' !== typeof responseData ) {
+      return false;
+    }
+
+    if ( responseContainsWooCommerceError( responseData ) ) {
+      return true;
+    }
+
+    const normalizedError = normalizeResponseFlag( responseData.error );
+
+    if ( true === normalizedError ) {
+      return true;
+    }
+
+    if ( false === normalizedError ) {
+      return false;
+    }
+
+    const normalizedSuccess = normalizeResponseFlag( responseData.success );
+
+    if ( false === normalizedSuccess ) {
+      return true;
+    }
+
+    if ( true === normalizedSuccess ) {
+      return false;
+    }
+
+    if ( Object.prototype.hasOwnProperty.call( responseData, 'error' ) ) {
+      if ( responseIncludesCartData( responseData ) ) {
+        return false;
+      }
+
+      return Boolean( responseData.error );
+    }
+
+    return false;
+  }
+
   function getAddToCartErrorMessage( responseData, entry ) {
     const candidates = [];
 
@@ -1944,7 +2055,9 @@ CSS;
 
       responseData = await response.json().catch( () => null );
 
-      if ( responseData && responseData.error ) {
+      const responseHasError = responseIndicatesAddToCartError( responseData );
+
+      if ( responseHasError ) {
         showCommerceMessage( getAddToCartErrorMessage( responseData, entry ), 'error' );
         return;
       }
