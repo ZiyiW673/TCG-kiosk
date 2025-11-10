@@ -1453,13 +1453,15 @@ CSS;
       return 0;
     }
 
-    const candidates = [ entry.variationId, entry.variation_id, entry.id ];
+    const candidates = [];
+
+    if ( entry.type === 'variation' ) {
+      candidates.push( entry.variationId, entry.variation_id, entry.id );
+    } else {
+      candidates.push( entry.variationId, entry.variation_id );
+    }
 
     for ( const candidate of candidates ) {
-      if ( ! candidate && 0 !== candidate ) {
-        continue;
-      }
-
       const parsed = Number.parseInt( candidate, 10 );
 
       if ( Number.isInteger( parsed ) && parsed > 0 ) {
@@ -1472,56 +1474,43 @@ CSS;
 
   function buildAddToCartPayload( entry, options ) {
     const params = new URLSearchParams();
-    const includeAddToCartParam = options && options.includeAddToCartParam;
 
     if ( ! entry ) {
       return params;
     }
 
-    const productId =
-      entry.productId ||
-      entry.parentId ||
-      entry.parent_id ||
-      ( entry.type === 'variation' ? entry.product_id : 0 ) ||
-      entry.variationId ||
-      entry.variation_id;
-
-    const addToCartId =
-      entry.productId || entry.parentId || entry.parent_id || entry.product_id || productId;
+    const includeAddToCartParam = options && options.includeAddToCartParam;
+    const isVariation = entry.type === 'variation';
+    const parentId =
+      entry.parentId || entry.parent_id || ( isVariation ? Number.parseInt( entry.product_id, 10 ) || 0 : 0 );
+    const productId = entry.productId || ( isVariation ? parentId : Number.parseInt( entry.id, 10 ) || 0 );
+    const variationId = getEntryVariationId( entry );
 
     if ( productId ) {
       params.set( 'product_id', String( productId ) );
     }
 
-    if ( includeAddToCartParam && addToCartId ) {
-      params.set( 'add-to-cart', String( addToCartId ) );
-    }
+    if ( includeAddToCartParam ) {
+      const addToCartId = variationId && parentId ? parentId : productId;
 
-    const variationId = getEntryVariationId( entry );
+      if ( addToCartId ) {
+        params.set( 'add-to-cart', String( addToCartId ) );
+      }
+    }
 
     if ( variationId ) {
       params.set( 'variation_id', String( variationId ) );
     }
 
-    params.set( 'quantity', '1' );
+    const quantity = Number.parseInt( entry.quantity, 10 );
+    params.set( 'quantity', String( Number.isInteger( quantity ) && quantity > 0 ? quantity : 1 ) );
 
     if ( entry.attributes && 'object' === typeof entry.attributes ) {
-      Object.keys( entry.attributes ).forEach( ( key ) => {
-        const rawValue = entry.attributes[ key ];
-
-        if ( ! key || null === rawValue || undefined === rawValue ) {
-          return;
-        }
-
+      Object.entries( entry.attributes ).forEach( ( [ key, value ] ) => {
         const normalizedKey = normalizeAttributeKey( key );
+        const normalizedValue = String( value || '' ).trim();
 
-        if ( ! normalizedKey ) {
-          return;
-        }
-
-        const normalizedValue = String( rawValue ).trim();
-
-        if ( ! normalizedValue ) {
+        if ( ! normalizedKey || ! normalizedValue ) {
           return;
         }
 
@@ -1538,31 +1527,21 @@ CSS;
       return '';
     }
 
-    const trimmed = String( key ).trim();
+    let normalizedKey = String( key ).trim();
 
-    if ( ! trimmed ) {
+    if ( ! normalizedKey ) {
       return '';
     }
 
-    if ( trimmed.startsWith( 'attribute_' ) ) {
-      return 'attribute_' === trimmed ? '' : trimmed;
+    if ( normalizedKey.startsWith( 'attribute_' ) ) {
+      return normalizedKey;
     }
 
-    const withoutPrefix = trimmed.startsWith( 'attribute' )
-      ? trimmed.replace( /^attribute_?/, '' )
-      : trimmed.replace( /^_+/, '' );
-
-    if ( withoutPrefix.startsWith( 'pa_' ) ) {
-      return `attribute_${ withoutPrefix }`;
+    if ( normalizedKey.startsWith( 'pa_' ) ) {
+      return `attribute_${ normalizedKey }`;
     }
 
-    const candidate = withoutPrefix || trimmed;
-
-    if ( ! candidate ) {
-      return '';
-    }
-
-    return `attribute_${ candidate }`;
+    return `attribute_pa_${ normalizedKey.replace( /^_+/, '' ) }`;
   }
 
   function updateAddToCartLoading( loading ) {
