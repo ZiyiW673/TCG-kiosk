@@ -291,126 +291,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 }
             }
 
-            if ( ! empty( $matches ) ) {
-                $matches = $this->expand_variable_product_matches( $matches );
-            }
-
             return apply_filters( 'tcg_kiosk_card_product_matches', $matches, $card, $type_slug, $lookup, $candidates );
-        }
-
-        /**
-         * Ensure variable products expose their purchasable variations to the front end.
-         *
-         * @param array $matches Matched product payloads.
-         *
-         * @return array
-         */
-        protected function expand_variable_product_matches( array $matches ) {
-            if ( empty( $matches ) ) {
-                return $matches;
-            }
-
-            $expanded = array();
-            $seen      = array();
-
-            foreach ( $matches as $match ) {
-                if ( empty( $match ) || ! is_array( $match ) ) {
-                    continue;
-                }
-
-                $product_id   = isset( $match['productId'] ) ? (int) $match['productId'] : 0;
-                $variation_id = isset( $match['variationId'] ) ? (int) $match['variationId'] : 0;
-                $unique_key   = $product_id . '|' . $variation_id;
-
-                if ( isset( $seen[ $unique_key ] ) ) {
-                    $index = $seen[ $unique_key ];
-
-                    if ( isset( $expanded[ $index ]['matchedIdentifiers'] ) && isset( $match['matchedIdentifiers'] ) ) {
-                        $expanded[ $index ]['matchedIdentifiers'] = array_values(
-                            array_unique(
-                                array_merge(
-                                    (array) $expanded[ $index ]['matchedIdentifiers'],
-                                    (array) $match['matchedIdentifiers']
-                                )
-                            )
-                        );
-                    }
-
-                    continue;
-                }
-
-                $expanded[]              = $match;
-                $seen[ $unique_key ]     = count( $expanded ) - 1;
-            }
-
-            foreach ( $expanded as $match ) {
-                $product_id   = isset( $match['productId'] ) ? (int) $match['productId'] : 0;
-                $variation_id = isset( $match['variationId'] ) ? (int) $match['variationId'] : 0;
-
-                if ( $variation_id > 0 || $product_id <= 0 ) {
-                    continue;
-                }
-
-                $type = isset( $match['type'] ) ? strtolower( (string) $match['type'] ) : '';
-
-                if ( 'variable' !== $type ) {
-                    continue;
-                }
-
-                if ( ! function_exists( 'wc_get_product' ) ) {
-                    continue;
-                }
-
-                $product = wc_get_product( $product_id );
-
-                if ( ! $product || ! $product->is_type( 'variable' ) ) {
-                    continue;
-                }
-
-                $matched_identifiers = isset( $match['matchedIdentifiers'] ) && is_array( $match['matchedIdentifiers'] )
-                    ? array_values( array_unique( array_filter( $match['matchedIdentifiers'] ) ) )
-                    : array();
-
-                foreach ( $product->get_children() as $child_id ) {
-                    $child_id = (int) $child_id;
-
-                    if ( $child_id <= 0 ) {
-                        continue;
-                    }
-
-                    $unique_key = $product_id . '|' . $child_id;
-
-                    if ( isset( $seen[ $unique_key ] ) ) {
-                        $index = $seen[ $unique_key ];
-
-                        if ( isset( $expanded[ $index ]['matchedIdentifiers'] ) ) {
-                            $expanded[ $index ]['matchedIdentifiers'] = array_values( array_unique( array_merge(
-                                (array) $expanded[ $index ]['matchedIdentifiers'],
-                                $matched_identifiers
-                            ) ) );
-                        } else {
-                            $expanded[ $index ]['matchedIdentifiers'] = $matched_identifiers;
-                        }
-
-                        continue;
-                    }
-
-                    $variation = wc_get_product( $child_id );
-
-                    if ( $variation ) {
-                        $payload = $this->format_variation_payload( $variation, $product );
-                    } else {
-                        $payload = $this->format_basic_variation_payload( $child_id, $product );
-                    }
-
-                    $payload['matchedIdentifiers'] = $matched_identifiers;
-
-                    $expanded[]          = $payload;
-                    $seen[ $unique_key ] = count( $expanded ) - 1;
-                }
-            }
-
-            return $expanded;
         }
 
         /**
@@ -798,7 +679,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
         protected function format_variation_payload( $variation, $parent_product = null ) {
             $parent_id         = $variation ? (int) $variation->get_parent_id() : ( $parent_product ? (int) $parent_product->get_id() : 0 );
             $attribute_summary = '';
-            $attribute_source  = array();
 
             if ( $variation ) {
                 if ( method_exists( $variation, 'get_attribute_summary' ) ) {
@@ -815,14 +695,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     if ( is_string( $formatted ) ) {
                         $attribute_summary = $this->sanitize_text_value( $formatted );
                     }
-                }
-
-                if ( function_exists( 'wc_get_product_variation_attributes' ) ) {
-                    $attribute_source = wc_get_product_variation_attributes( $variation->get_id() );
-                }
-
-                if ( empty( $attribute_source ) ) {
-                    $attribute_source = $variation->get_attributes();
                 }
             }
 
@@ -846,7 +718,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'permalink'        => $this->sanitize_url_value(
                     $variation ? $variation->get_permalink() : ( $parent_product ? $parent_product->get_permalink() : '' )
                 ),
-                'attributes'       => $this->prepare_variation_attributes( $attribute_source ),
+                'attributes'       => $variation ? $this->prepare_variation_attributes( $variation->get_attributes() ) : array(),
                 'attributeSummary' => $attribute_summary,
             );
         }
@@ -861,11 +733,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          */
         protected function format_basic_variation_payload( $variation_id, $parent_product = null ) {
             $parent_id = $parent_product ? (int) $parent_product->get_id() : 0;
-            $attributes = array();
-
-            if ( $variation_id && function_exists( 'wc_get_product_variation_attributes' ) ) {
-                $attributes = wc_get_product_variation_attributes( $variation_id );
-            }
 
             return array(
                 'productId'        => $parent_id,
@@ -885,7 +752,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'stockQuantity'    => null,
                 'backordersAllowed'=> false,
                 'permalink'        => $this->sanitize_url_value( $parent_product ? $parent_product->get_permalink() : '' ),
-                'attributes'       => $this->prepare_variation_attributes( $attributes ),
+                'attributes'       => array(),
                 'attributeSummary' => '',
             );
         }
@@ -961,17 +828,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $value = reset( $value );
                 }
 
-                $attribute_value = '';
-
-                if ( is_scalar( $value ) || ( is_object( $value ) && method_exists( $value, '__toString' ) ) ) {
-                    $attribute_value = (string) $value;
-                }
-
-                $attribute_value = trim( $attribute_value );
-
-                if ( '' === $attribute_value && '0' !== $attribute_value ) {
-                    continue;
-                }
+                $attribute_value = is_scalar( $value ) ? (string) $value : '';
 
                 if ( function_exists( 'wc_clean' ) ) {
                     $attribute_value = wc_clean( $attribute_value );
@@ -981,49 +838,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $attribute_value = $this->sanitize_text_value( $attribute_value );
                 }
 
-                $submission_key = $attribute_key;
-
-                if ( function_exists( 'wc_variation_attribute_name' ) ) {
-                    $normalized_name = wc_variation_attribute_name( $attribute_key );
-
-                    if ( is_string( $normalized_name ) && '' !== $normalized_name ) {
-                        $submission_key = $normalized_name;
-                    }
-                }
-
-                if ( 0 !== strpos( $submission_key, 'attribute_' ) ) {
-                    $normalized_key = ltrim( $submission_key, '_' );
-
-                    if ( '' !== $normalized_key ) {
-                        $submission_key = 'attribute_' . $normalized_key;
-                    } else {
-                        $submission_key = 'attribute_' . $submission_key;
-                    }
-                }
-
-                $taxonomy_key = $submission_key;
-
-                if ( 0 === strpos( $taxonomy_key, 'attribute_' ) ) {
-                    $taxonomy_key = substr( $taxonomy_key, strlen( 'attribute_' ) );
-                }
-
-                $is_taxonomy_attribute = 0 === strpos( $taxonomy_key, 'pa_' );
-
-                if ( $is_taxonomy_attribute ) {
-                    if ( function_exists( 'wc_sanitize_taxonomy_name' ) ) {
-                        $attribute_value = wc_sanitize_taxonomy_name( $attribute_value );
-                    } elseif ( function_exists( 'sanitize_title' ) ) {
-                        $attribute_value = sanitize_title( $attribute_value );
-                    } else {
-                        $attribute_value = $this->sanitize_text_value( $attribute_value );
-                    }
-                }
-
-                $prepared[ $submission_key ] = $attribute_value;
-
-                if ( $submission_key !== $attribute_key ) {
-                    $prepared[ $attribute_key ] = $attribute_value;
-                }
+                $prepared[ $attribute_key ] = $attribute_value;
             }
 
             return $prepared;
