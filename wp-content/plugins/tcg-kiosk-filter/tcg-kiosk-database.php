@@ -520,6 +520,51 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
 
             $variation = function_exists( 'wc_get_product' ) ? wc_get_product( $variation_id ) : null;
 
+            if ( ! $parent_product && $variation && method_exists( $variation, 'get_parent_id' ) ) {
+                $parent_id = $variation->get_parent_id();
+
+                if ( $parent_id && function_exists( 'wc_get_product' ) ) {
+                    $parent_product = wc_get_product( $parent_id );
+                }
+            }
+
+            $parent_identifiers = array();
+
+            if ( $parent_product ) {
+                $parent_id = (int) $parent_product->get_id();
+
+                if ( $parent_id ) {
+                    $parent_identifiers[] = $parent_id;
+                }
+
+                $parent_sku = $parent_product->get_sku();
+
+                if ( $parent_sku ) {
+                    $parent_identifiers[] = $parent_sku;
+                }
+
+                $parent_meta_keys = apply_filters(
+                    'tcg_kiosk_product_card_meta_keys',
+                    array(
+                        '_tcg_card_id',
+                        '_tcg_card_ids',
+                        'tcg_card_id',
+                        'tcg_card_ids',
+                    ),
+                    $parent_id
+                );
+
+                foreach ( $parent_meta_keys as $meta_key ) {
+                    $value = get_post_meta( $parent_id, $meta_key, true );
+
+                    if ( empty( $value ) && '0' !== $value ) {
+                        continue;
+                    }
+
+                    $parent_identifiers = array_merge( $parent_identifiers, $this->extract_identifier_values( $value ) );
+                }
+            }
+
             if ( $variation ) {
                 $sku = $variation->get_sku();
 
@@ -530,6 +575,10 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 $payload = $this->format_variation_payload( $variation, $parent_product );
             } else {
                 $payload = $this->format_basic_variation_payload( $variation_id, $parent_product );
+            }
+
+            if ( ! empty( $parent_identifiers ) ) {
+                $identifiers = array_merge( $identifiers, $parent_identifiers );
             }
 
             $identifiers = array_values( array_unique( array_filter( array_map( array( $this, 'sanitize_identifier_value' ), $identifiers ) ) ) );
