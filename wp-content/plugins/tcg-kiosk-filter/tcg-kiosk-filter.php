@@ -1405,7 +1405,10 @@ CSS;
     const productId = entry.productId || entry.parentId || entry.variationId;
 
     if ( productId ) {
-      params.set( 'product_id', String( productId ) );
+      const idValue = String( productId );
+
+      params.set( 'product_id', idValue );
+      params.set( 'add-to-cart', idValue );
     }
 
     if ( entry.variationId ) {
