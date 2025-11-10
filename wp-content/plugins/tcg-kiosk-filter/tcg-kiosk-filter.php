@@ -1448,6 +1448,28 @@ CSS;
     return true;
   }
 
+  function getEntryVariationId( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return 0;
+    }
+
+    const candidates = [ entry.variationId, entry.variation_id, entry.id ];
+
+    for ( const candidate of candidates ) {
+      if ( ! candidate && 0 !== candidate ) {
+        continue;
+      }
+
+      const parsed = Number.parseInt( candidate, 10 );
+
+      if ( Number.isInteger( parsed ) && parsed > 0 ) {
+        return parsed;
+      }
+    }
+
+    return 0;
+  }
+
   function buildAddToCartPayload( entry, options ) {
     const params = new URLSearchParams();
     const includeAddToCartParam = options && options.includeAddToCartParam;
@@ -1456,20 +1478,29 @@ CSS;
       return params;
     }
 
-    const productId = entry.productId || entry.parentId || entry.variationId;
+    const productId =
+      entry.productId ||
+      entry.parentId ||
+      entry.parent_id ||
+      ( entry.type === 'variation' ? entry.product_id : 0 ) ||
+      entry.variationId ||
+      entry.variation_id;
+
+    const addToCartId =
+      entry.productId || entry.parentId || entry.parent_id || entry.product_id || productId;
 
     if ( productId ) {
-      const idValue = String( productId );
-
-      params.set( 'product_id', idValue );
-
-      if ( includeAddToCartParam ) {
-        params.set( 'add-to-cart', idValue );
-      }
+      params.set( 'product_id', String( productId ) );
     }
 
-    if ( entry.variationId ) {
-      params.set( 'variation_id', String( entry.variationId ) );
+    if ( includeAddToCartParam && addToCartId ) {
+      params.set( 'add-to-cart', String( addToCartId ) );
+    }
+
+    const variationId = getEntryVariationId( entry );
+
+    if ( variationId ) {
+      params.set( 'variation_id', String( variationId ) );
     }
 
     params.set( 'quantity', '1' );
@@ -1495,6 +1526,7 @@ CSS;
         }
 
         params.set( normalizedKey, normalizedValue );
+        params.set( `variation[${ normalizedKey }]`, normalizedValue );
       } );
     }
 
