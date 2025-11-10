@@ -112,6 +112,24 @@ class TCG_Kiosk_Filter_Plugin {
         wp_add_inline_script( 'tcg-kiosk-filter', $this->get_inline_script() );
 
         $data = $this->database->get_tcg_data();
+        $type_icon_base_url = trailingslashit( plugins_url( 'assets/icon', __FILE__ ) );
+        $type_icon_map      = array(
+            'colorless' => 'colorless.png',
+            'darkness'  => 'darkness.png',
+            'dragon'    => 'dragon.png',
+            'fairy'     => 'fairy.png',
+            'fighting'  => 'fighting.png',
+            'fire'      => 'fire.png',
+            'grass'     => 'grass.png',
+            'lightning' => 'lightning.png',
+            'metal'     => 'metal.png',
+            'psychic'   => 'psychic.png',
+            'water'     => 'water.png',
+        );
+
+        $commerce_settings = array(
+            'addToCartNonce' => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( 'add-to-cart' ) : '',
+        );
 
         wp_localize_script(
             'tcg-kiosk-filter',
@@ -119,6 +137,11 @@ class TCG_Kiosk_Filter_Plugin {
             array(
                 'cards'        => $data['cards'],
                 'lastModified' => $data['lastModified'],
+                'typeIcons'    => array(
+                    'baseUrl' => $type_icon_base_url,
+                    'map'     => $type_icon_map,
+                ),
+                'commerce'     => $commerce_settings,
                 'i18n'         => array(
                     'allSets'  => __( 'All Sets', 'tcg-kiosk-filter' ),
                     'allTypeTemplate' => __( 'All %s', 'tcg-kiosk-filter' ),
@@ -137,6 +160,15 @@ class TCG_Kiosk_Filter_Plugin {
                     'setLabel' => __( 'Set', 'tcg-kiosk-filter' ),
                     'idLabel' => __( 'Card ID', 'tcg-kiosk-filter' ),
                     'typeLabel' => __( 'Type', 'tcg-kiosk-filter' ),
+                    'addToCart' => __( 'Add to cart', 'tcg-kiosk-filter' ),
+                    'addingToCart' => __( 'Adding…', 'tcg-kiosk-filter' ),
+                    'addedToCart' => __( '%s was added to your cart.', 'tcg-kiosk-filter' ),
+                    'addToCartError' => __( 'Unable to add this item to your cart.', 'tcg-kiosk-filter' ),
+                    'selectProductOption' => __( 'Select a product option', 'tcg-kiosk-filter' ),
+                    'productOptionLabel' => __( 'Option %s', 'tcg-kiosk-filter' ),
+                    'outOfStock' => __( 'Out of stock', 'tcg-kiosk-filter' ),
+                    'notPurchasable' => __( 'This product cannot be purchased right now.', 'tcg-kiosk-filter' ),
+                    'chooseVariant' => __( 'Choose a version', 'tcg-kiosk-filter' ),
                 ),
             )
         );
@@ -160,10 +192,17 @@ class TCG_Kiosk_Filter_Plugin {
     overflow: hidden;
 }
 
+header {
+    padding: 0 10px 10px 10px;
+    border-bottom: 1px solid grey;
+}
+
 .tcg-kiosk__header {
     display: flex;
     align-items: flex-start;
     gap: var(--tcg-gap);
+    padding: 0 10px 10px 10px;
+    border-bottom: 1px solid grey;
 }
 
 .tcg-kiosk__filters {
@@ -172,6 +211,7 @@ class TCG_Kiosk_Filter_Plugin {
     align-items: flex-end;
     flex-wrap: wrap;
     gap: 1rem;
+    margin-top: 30px;
 }
 
 .tcg-kiosk__type-filter {
@@ -179,21 +219,41 @@ class TCG_Kiosk_Filter_Plugin {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    margin-top: 15px;
 }
 
 .tcg-kiosk__type-filter[hidden] {
     display: none;
 }
 
-.tcg-kiosk__type-filter-label {
-    font-weight: 600;
-    color: #1d2327;
+.tcg-kiosk__type-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
-.tcg-kiosk__type-options {
+.tcg-kiosk__type-row {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+    justify-content: flex-start;
+}
+
+.tcg-kiosk__type-row--primary {
+    justify-content: center;
+}
+
+.tcg-kiosk__type-row--trainer {
+    justify-content: center;
+}
+
+.tcg-kiosk__type-row--colors,
+.tcg-kiosk__type-row--types {
+    justify-content: center;
+}
+
+.tcg-kiosk__type-row--colors {
+    gap: 0.65rem;
 }
 
 .tcg-kiosk__overlay {
@@ -293,6 +353,117 @@ class TCG_Kiosk_Filter_Plugin {
     white-space: pre-line;
 }
 
+.tcg-kiosk__card-overlay-commerce {
+    margin-top: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.tcg-kiosk__card-overlay-price {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111;
+}
+
+.tcg-kiosk__card-overlay-variant {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.tcg-kiosk__card-overlay-variant-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.tcg-kiosk__card-overlay-variant-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tcg-kiosk__card-overlay-variant-button {
+    border: 1px solid #c3c4c7;
+    border-radius: 999px;
+    background-color: #fff;
+    color: #1d2327;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 0.35rem 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+.tcg-kiosk__card-overlay-variant-button:focus-visible {
+    outline: 2px solid #2271b1;
+    outline-offset: 2px;
+}
+
+.tcg-kiosk__card-overlay-variant-button:hover,
+.tcg-kiosk__card-overlay-variant-button:focus-visible {
+    background-color: #f0f6fc;
+    border-color: #2271b1;
+    color: #0a4b78;
+}
+
+.tcg-kiosk__card-overlay-variant-button[aria-pressed="true"],
+.tcg-kiosk__card-overlay-variant-button--active {
+    background-color: #2271b1;
+    border-color: #135e96;
+    color: #fff;
+}
+
+.tcg-kiosk__card-overlay-variant-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tcg-kiosk__card-overlay-add-to-cart {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: 4px;
+    background-color: #2271b1;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+
+.tcg-kiosk__card-overlay-add-to-cart:hover:not(:disabled),
+.tcg-kiosk__card-overlay-add-to-cart:focus-visible:not(:disabled) {
+    background-color: #135e96;
+}
+
+.tcg-kiosk__card-overlay-add-to-cart:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tcg-kiosk__card-overlay-commerce-message {
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.tcg-kiosk__card-overlay-commerce-message[hidden] {
+    display: none;
+}
+
+.tcg-kiosk__card-overlay-commerce-message[data-status="error"] {
+    color: #b81c23;
+}
+
+.tcg-kiosk__card-overlay-commerce-message[data-status="success"] {
+    color: #0f834d;
+}
+
 .tcg-kiosk__card-overlay-empty {
     grid-column: 1 / -1;
     margin: 0;
@@ -347,9 +518,12 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk__overlay-options {
-    display: grid;
+    display: flex;
+    flex-direction: row;
     gap: 1.5rem;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    justify-content: center;
+    align-items: stretch;
+    flex-wrap: nowrap;
 }
 
 .tcg-kiosk__overlay-button {
@@ -421,6 +595,10 @@ class TCG_Kiosk_Filter_Plugin {
 }
 
 .tcg-kiosk__type-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 999px;
     border: 1px solid #ccd0d4;
     background-color: #fff;
@@ -429,6 +607,48 @@ class TCG_Kiosk_Filter_Plugin {
     font-size: 13px;
     cursor: pointer;
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    min-height: 2.25rem;
+}
+
+.tcg-kiosk__type-button--has-icon {
+    padding: 0.25rem;
+    min-width: 3.5rem;
+}
+
+.tcg-kiosk__type-button--large-icon {
+    min-width: 2.5rem;
+    border: none;
+}
+
+.tcg-kiosk__type-button--compact-icon {
+    border: none;
+    padding: 0.2rem;
+}
+
+.tcg-kiosk__type-button-image {
+    display: block;
+    max-height: 2.25rem;
+    width: auto;
+}
+
+.tcg-kiosk__type-button--large-icon .tcg-kiosk__type-button-image {
+    height: 25px;
+}
+
+.tcg-kiosk__type-button--compact-icon .tcg-kiosk__type-button-image {
+    max-height: 1.5rem;
+}
+
+.tcg-kiosk__type-button-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .tcg-kiosk__type-button:hover,
@@ -442,6 +662,33 @@ class TCG_Kiosk_Filter_Plugin {
     background-color: #2271b1;
     border-color: #0a4b78;
     color: #fff;
+}
+
+.tcg-kiosk__type-button--color-swatch {
+    padding: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    border: none;
+    background-color: var(--tcg-kiosk-swatch-color, #2271b1);
+    color: var(--tcg-kiosk-swatch-foreground, #fff);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.tcg-kiosk__type-button--color-swatch:hover,
+.tcg-kiosk__type-button--color-swatch:focus {
+    border: none;
+    box-shadow: 0 0 0 3px rgba(34, 113, 177, 0.35);
+    color: var(--tcg-kiosk-swatch-foreground, #fff);
+    outline: none;
+}
+
+.tcg-kiosk__type-button--color-swatch.is-active {
+    box-shadow: 0 0 0 3px #fff, 0 0 0 5px #2271b1;
+    background-color: var(--tcg-kiosk-swatch-color, #2271b1);
+    color: var(--tcg-kiosk-swatch-foreground, #fff);
 }
 
 .tcg-kiosk__filters label {
@@ -469,12 +716,17 @@ class TCG_Kiosk_Filter_Plugin {
 .tcg-kiosk__actions {
     flex: 0 0 25%;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 1rem;
+    margin-top: 14px;
 }
 
 .tcg-kiosk__search {
     position: relative;
+    display: flex;
+    width: 80%;
+    height: 80%;
+    margin-top: 16px;
 }
 
 .tcg-kiosk__search input[type="search"] {
@@ -486,6 +738,10 @@ class TCG_Kiosk_Filter_Plugin {
     flex-direction: column;
     font-weight: 600;
     color: #1d2327;
+    width: 18%;
+    margin-right: 0;
+    margin-left: auto;
+    font-size: 9px;
 }
 
 .tcg-kiosk__page-size select {
@@ -669,7 +925,6 @@ CSS;
   const gameSelect = document.getElementById( 'tcg-kiosk-game' );
   const setSelect = document.getElementById( 'tcg-kiosk-set' );
   const typeFilterWrapper = document.getElementById( 'tcg-kiosk-type-filter' );
-  const typeFilterLabel = document.getElementById( 'tcg-kiosk-type-label' );
   const typeOptionsContainer = document.getElementById( 'tcg-kiosk-type-options' );
   const searchInput = document.getElementById( 'tcg-kiosk-search' );
   const pageSizeSelect = document.getElementById( 'tcg-kiosk-page-size' );
@@ -686,13 +941,174 @@ CSS;
   const cardOverlayTitle = document.getElementById( 'tcg-kiosk-detail-title' );
   const cardOverlayDetails = document.getElementById( 'tcg-kiosk-detail-metadata' );
   const cardOverlayClose = document.getElementById( 'tcg-kiosk-detail-close' );
+  const cardOverlayCommerce = document.getElementById( 'tcg-kiosk-card-overlay-commerce' );
+  const cardOverlayPrice = document.getElementById( 'tcg-kiosk-card-overlay-price' );
+  const cardOverlayVariantContainer = document.getElementById( 'tcg-kiosk-card-overlay-variant' );
+  const cardOverlayVariantLabel = document.getElementById( 'tcg-kiosk-card-overlay-variant-label' );
+  const cardOverlayVariantOptions = document.getElementById( 'tcg-kiosk-card-overlay-variant-options' );
+  const cardOverlayAddToCart = document.getElementById( 'tcg-kiosk-card-overlay-add-to-cart' );
+  const cardOverlayCommerceMessage = document.getElementById( 'tcg-kiosk-card-overlay-commerce-message' );
+  const typeIconConfig = window.tcgKioskData.typeIcons || {};
+  const typeIconBaseUrl = 'string' === typeof typeIconConfig.baseUrl ? typeIconConfig.baseUrl : '';
+  const typeIconMap = typeIconConfig.map && 'object' === typeof typeIconConfig.map ? typeIconConfig.map : {};
+  const LARGE_TYPE_ICON_KEYS = new Set( [
+    'colorless',
+    'darkness',
+    'dragon',
+    'fairy',
+    'fighting',
+    'fire',
+    'grass',
+    'lightning',
+    'metal',
+    'psychic',
+    'water',
+  ] );
+  const COMPACT_TYPE_ICON_KEYS = new Set( [
+    'pokemon_tool',
+    'stadium',
+    'supporter',
+    'item',
+  ] );
+  const ONE_PIECE_COLOR_SWATCHES = new Map( [
+    [ 'red', '#d0051e' ],
+    [ 'green', '#13865f' ],
+    [ 'blue', '#1d76b8' ],
+    [ 'purple', '#8f4593' ],
+    [ 'black', '#5b605c' ],
+    [ 'yellow', '#ede256' ],
+  ] );
+  let currentCommerceCard = null;
+  let currentCommerceEntries = [];
+  let currentCommerceSelectionIndex = -1;
+  let isAddingToCart = false;
+  let cardOverlayVariantButtons = [];
+  const ONE_PIECE_COLOR_FOREGROUND = new Map( [
+    [ 'yellow', '#1d2327' ],
+  ] );
+  const commerceMessageParser = document.createElement( 'div' );
 
-  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeFilterLabel || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
+  function getCommerceDebugMode() {
+    const value = window.tcgKioskDebugCommerce;
+
+    if ( 'string' === typeof value ) {
+      return value.trim().toLowerCase();
+    }
+
+    if ( value ) {
+      return 'log';
+    }
+
+    return '';
+  }
+
+  function isCommerceDebugging() {
+    const mode = getCommerceDebugMode();
+
+    return !! mode && 'off' !== mode;
+  }
+
+  function shouldForceVariantButtons() {
+    const mode = getCommerceDebugMode();
+
+    return [ 'showall', 'force', 'all', 'buttons' ].includes( mode );
+  }
+
+  function withCommerceDebug( callback ) {
+    if ( ! isCommerceDebugging() || 'function' !== typeof callback ) {
+      return;
+    }
+
+    try {
+      callback();
+    } catch ( error ) {
+      if ( window.console && window.console.error ) {
+        window.console.error( error );
+      }
+    }
+  }
+
+  function formatCommerceEntryForDebug( entry, index ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return { index, note: 'invalid entry' };
+    }
+
+    const matched = Array.isArray( entry.matchedIdentifiers )
+      ? entry.matchedIdentifiers.join( ', ' )
+      : '';
+
+    return {
+      index,
+      type: entry.type || '',
+      productId: entry.productId || '',
+      variationId: entry.variationId || '',
+      sku: entry.sku || '',
+      isPurchasable: !! entry.isPurchasable,
+      isInStock: !! entry.isInStock,
+      backordersAllowed: !! entry.backordersAllowed,
+      stockStatus: entry.stockStatus || '',
+      price: entry.price || '',
+      matched,
+    };
+  }
+
+  function debugCommerceEntries( card, entries, context ) {
+    withCommerceDebug( () => {
+      if ( ! window.console ) {
+        return;
+      }
+
+      const consoleRef = window.console;
+      const cardName = card && card.name ? card.name : 'Unknown card';
+      const headingParts = [ '[TCG Kiosk] Commerce entries' ];
+
+      if ( context ) {
+        headingParts.push( '(' + context + ')' );
+      }
+
+      headingParts.push( '–', cardName );
+
+      const heading = headingParts.join( ' ' );
+
+      if ( consoleRef.groupCollapsed ) {
+        consoleRef.groupCollapsed( heading );
+      } else if ( consoleRef.group ) {
+        consoleRef.group( heading );
+      }
+
+      const payload = {
+        cardId: card && card.id ? card.id : null,
+        totalEntries: Array.isArray( entries ) ? entries.length : 0,
+        context,
+      };
+
+      if ( consoleRef.log ) {
+        consoleRef.log( payload );
+      }
+
+      if ( consoleRef.table && Array.isArray( entries ) ) {
+        consoleRef.table( entries.map( formatCommerceEntryForDebug ) );
+      } else if ( consoleRef.log && Array.isArray( entries ) ) {
+        consoleRef.log( entries.map( formatCommerceEntryForDebug ) );
+      }
+
+      if ( consoleRef.groupEnd ) {
+        consoleRef.groupEnd();
+      }
+    } );
+  }
+
+  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
   }
 
   const data = window.tcgKioskData.cards;
   const i18n = window.tcgKioskData.i18n || {};
+  const DEFAULT_TYPE_LABEL =
+    ( typeFilterWrapper.dataset && typeFilterWrapper.dataset.defaultLabel ) ||
+    i18n.typeLabel ||
+    'Type';
+  let currentTypeLabel = DEFAULT_TYPE_LABEL;
   const DEFAULT_PAGE_SIZE = parseInt( pageSizeSelect.value, 10 ) || 10;
   let cardsPerPage = DEFAULT_PAGE_SIZE;
   let hasInteracted = false;
@@ -716,6 +1132,58 @@ CSS;
     return option;
   }
 
+  function normalizeTypeIconKey( value ) {
+    if ( 'string' !== typeof value && 'number' !== typeof value ) {
+      return '';
+    }
+
+    let processed = String( value ).trim().toLowerCase();
+
+    if ( ! processed ) {
+      return '';
+    }
+
+    if ( processed.normalize ) {
+      processed = processed.normalize( 'NFD' );
+    }
+
+    processed = processed.replace( /[\u0300-\u036f]/g, '' );
+    processed = processed.replace( /[^a-z0-9]+/g, '_' );
+    processed = processed.replace( /^_+|_+$/g, '' );
+
+    return processed;
+  }
+
+  function getTypeIconUrl( label, value ) {
+    if ( ! typeIconBaseUrl || ! typeIconMap || 'object' !== typeof typeIconMap ) {
+      return '';
+    }
+
+    const candidates = [];
+
+    if ( value ) {
+      candidates.push( value );
+    }
+
+    if ( label && label !== value ) {
+      candidates.push( label );
+    }
+
+    for ( let index = 0; index < candidates.length; index += 1 ) {
+      const key = normalizeTypeIconKey( candidates[ index ] );
+
+      if ( key && Object.prototype.hasOwnProperty.call( typeIconMap, key ) ) {
+        const file = typeIconMap[ key ];
+
+        if ( file ) {
+          return typeIconBaseUrl + file;
+        }
+      }
+    }
+
+    return '';
+  }
+
   function populateGameOptions() {
     data.forEach( ( type ) => {
       if ( ! type || ! type.slug ) {
@@ -733,6 +1201,8 @@ CSS;
 
     const trigger = lastFocusedCard;
     const shouldRestoreFocus = ! options || options.restoreFocus !== false;
+
+    resetCommerceSection();
 
     if ( trigger && typeof trigger.setAttribute === 'function' ) {
       trigger.setAttribute( 'aria-expanded', 'false' );
@@ -826,9 +1296,9 @@ CSS;
     }
 
     if ( Array.isArray( card.typeValues ) && card.typeValues.length ) {
-      const typeLabel = typeFilterLabel && typeFilterLabel.textContent ? typeFilterLabel.textContent.trim() : '';
+      const typeLabel = currentTypeLabel || i18n.typeLabel || 'Type';
       entries.push( {
-        label: typeLabel || i18n.typeLabel || 'Type',
+        label: typeLabel,
         value: card.typeValues.join( ', ' ),
       } );
     }
@@ -838,6 +1308,660 @@ CSS;
     }
 
     return entries;
+  }
+
+  function resetCommerceSection() {
+    currentCommerceCard = null;
+    currentCommerceEntries = [];
+    currentCommerceSelectionIndex = -1;
+    isAddingToCart = false;
+    cardOverlayVariantButtons = [];
+
+    if ( cardOverlayCommerce ) {
+      cardOverlayCommerce.hidden = true;
+    }
+
+    if ( cardOverlayPrice ) {
+      cardOverlayPrice.innerHTML = '';
+      cardOverlayPrice.hidden = true;
+    }
+
+    if ( cardOverlayVariantContainer ) {
+      cardOverlayVariantContainer.hidden = true;
+      if ( cardOverlayVariantContainer.dataset ) {
+        delete cardOverlayVariantContainer.dataset.entryTotal;
+        delete cardOverlayVariantContainer.dataset.purchasableCount;
+        delete cardOverlayVariantContainer.dataset.buttonCount;
+        delete cardOverlayVariantContainer.dataset.debugMode;
+      }
+    }
+
+    if ( cardOverlayVariantLabel && i18n.chooseVariant ) {
+      cardOverlayVariantLabel.textContent = i18n.chooseVariant;
+    }
+
+    if ( cardOverlayVariantOptions ) {
+      cardOverlayVariantOptions.innerHTML = '';
+      const labelText = ( cardOverlayVariantLabel && cardOverlayVariantLabel.textContent ) || '';
+      if ( labelText ) {
+        cardOverlayVariantOptions.setAttribute( 'aria-label', labelText );
+      } else {
+        cardOverlayVariantOptions.removeAttribute( 'aria-label' );
+      }
+    }
+
+    if ( cardOverlayAddToCart ) {
+      cardOverlayAddToCart.disabled = true;
+      cardOverlayAddToCart.textContent = i18n.addToCart || 'Add to cart';
+    }
+
+    if ( cardOverlayCommerceMessage ) {
+      cardOverlayCommerceMessage.textContent = '';
+      cardOverlayCommerceMessage.hidden = true;
+      if ( cardOverlayCommerceMessage.dataset ) {
+        delete cardOverlayCommerceMessage.dataset.status;
+      }
+    }
+  }
+
+  function getEntryDisplayName( entry ) {
+    if ( entry ) {
+      if ( entry.attributeSummary ) {
+        return entry.attributeSummary;
+      }
+
+      if ( entry.name ) {
+        return entry.name;
+      }
+    }
+
+    if ( currentCommerceCard && currentCommerceCard.name ) {
+      return currentCommerceCard.name;
+    }
+
+    return '';
+  }
+
+  function getEntryOptionLabel( entry, index ) {
+    const candidates = [];
+
+    if ( entry ) {
+      if ( entry.attributeSummary ) {
+        candidates.push( entry.attributeSummary );
+      }
+
+      if ( entry.name ) {
+        candidates.push( entry.name );
+      }
+
+      if ( Array.isArray( entry.matchedIdentifiers ) && entry.matchedIdentifiers.length ) {
+        candidates.push( entry.matchedIdentifiers.join( ', ' ) );
+      }
+    }
+
+    const label = candidates.find( ( value ) => value && value.trim && value.trim() ) || '';
+
+    if ( label ) {
+      return label;
+    }
+
+    if ( i18n.productOptionLabel && i18n.productOptionLabel.includes( '%s' ) ) {
+      return i18n.productOptionLabel.replace( '%s', String( index + 1 ) );
+    }
+
+    return 'Option ' + String( index + 1 );
+  }
+
+  function isEntryPurchasable( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return false;
+    }
+
+    const purchasable = !! entry.isPurchasable;
+    const inStock = !! entry.isInStock;
+    const backordersAllowed = !! entry.backordersAllowed;
+
+    return purchasable && ( inStock || backordersAllowed );
+  }
+
+  function stripCommerceHtml( html ) {
+    if ( ! html || 'string' !== typeof html ) {
+      return '';
+    }
+
+    commerceMessageParser.innerHTML = html;
+    const text = commerceMessageParser.textContent || commerceMessageParser.innerText || '';
+    commerceMessageParser.innerHTML = '';
+
+    return text.trim();
+  }
+
+  function getAddToCartErrorMessage( responseData, entry ) {
+    const candidates = [];
+
+    if ( responseData && 'object' === typeof responseData ) {
+      if ( responseData.errorMessage && 'string' === typeof responseData.errorMessage ) {
+        candidates.push( responseData.errorMessage );
+      }
+
+      if ( responseData.message && 'string' === typeof responseData.message ) {
+        candidates.push( responseData.message );
+      }
+
+      if ( responseData.data ) {
+        if ( 'string' === typeof responseData.data ) {
+          candidates.push( responseData.data );
+        } else if ( responseData.data.message && 'string' === typeof responseData.data.message ) {
+          candidates.push( responseData.data.message );
+        }
+      }
+
+      if ( responseData.messages && 'string' === typeof responseData.messages ) {
+        candidates.push( stripCommerceHtml( responseData.messages ) );
+      }
+    }
+
+    const message = candidates.find( ( value ) => value && value.trim && value.trim() ) || '';
+
+    if ( message ) {
+      return message;
+    }
+
+    if ( entry && entry.type === 'variation' ) {
+      return i18n.selectProductOption || i18n.addToCartError || 'Unable to add this item to your cart.';
+    }
+
+    return i18n.addToCartError || 'Unable to add this item to your cart.';
+  }
+
+  function showCommerceMessage( message, status ) {
+    if ( ! cardOverlayCommerceMessage ) {
+      return;
+    }
+
+    const text = message ? String( message ) : '';
+
+    if ( ! text ) {
+      cardOverlayCommerceMessage.textContent = '';
+      cardOverlayCommerceMessage.hidden = true;
+      if ( cardOverlayCommerceMessage.dataset ) {
+        delete cardOverlayCommerceMessage.dataset.status;
+      }
+      return;
+    }
+
+    cardOverlayCommerceMessage.textContent = text;
+    cardOverlayCommerceMessage.hidden = false;
+
+    if ( cardOverlayCommerceMessage.dataset ) {
+      if ( status ) {
+        cardOverlayCommerceMessage.dataset.status = status;
+      } else {
+        delete cardOverlayCommerceMessage.dataset.status;
+      }
+    }
+  }
+
+  function setPriceDisplay( entry ) {
+    if ( ! cardOverlayPrice ) {
+      return;
+    }
+
+    let html = '';
+
+    if ( entry ) {
+      if ( entry.priceHtml ) {
+        html = entry.priceHtml;
+      } else if ( entry.price ) {
+        html = ( entry.currencySymbol || '' ) + String( entry.price );
+      }
+    }
+
+    if ( html ) {
+      cardOverlayPrice.innerHTML = html;
+      cardOverlayPrice.hidden = false;
+    } else {
+      cardOverlayPrice.innerHTML = '';
+      cardOverlayPrice.hidden = true;
+    }
+  }
+
+  function updateAddToCartButtonState( entry ) {
+    if ( ! cardOverlayAddToCart ) {
+      return;
+    }
+
+    if ( isAddingToCart ) {
+      cardOverlayAddToCart.textContent = i18n.addingToCart || 'Adding…';
+      cardOverlayAddToCart.disabled = true;
+      return;
+    }
+
+    cardOverlayAddToCart.textContent = i18n.addToCart || 'Add to cart';
+    cardOverlayAddToCart.disabled = ! isEntryPurchasable( entry );
+  }
+
+  function updateCommerceSelection( index ) {
+    if ( ! Array.isArray( currentCommerceEntries ) || ! currentCommerceEntries.length ) {
+      currentCommerceSelectionIndex = -1;
+      setPriceDisplay( null );
+      showCommerceMessage( '', '' );
+      updateAddToCartButtonState( null );
+      return;
+    }
+
+    let nextIndex = Number.isInteger( index ) ? index : parseInt( index, 10 );
+
+    if ( Number.isNaN( nextIndex ) || nextIndex < 0 || nextIndex >= currentCommerceEntries.length ) {
+      nextIndex = 0;
+    }
+
+    const entry = currentCommerceEntries[ nextIndex ] || null;
+    currentCommerceSelectionIndex = nextIndex;
+
+    if ( cardOverlayVariantButtons && cardOverlayVariantButtons.length ) {
+      cardOverlayVariantButtons.forEach( ( button ) => {
+        if ( ! button || ! button.dataset ) {
+          return;
+        }
+
+        const isActive = button.dataset.entryIndex === String( nextIndex );
+        button.setAttribute( 'aria-pressed', isActive ? 'true' : 'false' );
+
+        if ( isActive ) {
+          button.classList.add( 'tcg-kiosk__card-overlay-variant-button--active' );
+        } else {
+          button.classList.remove( 'tcg-kiosk__card-overlay-variant-button--active' );
+        }
+      } );
+    }
+
+    setPriceDisplay( entry );
+    showCommerceMessage( '', '' );
+
+    if ( entry && ! isEntryPurchasable( entry ) ) {
+      if ( entry.isPurchasable ) {
+        showCommerceMessage( i18n.outOfStock || 'Out of stock', 'error' );
+      } else {
+        showCommerceMessage( i18n.notPurchasable || 'This product cannot be purchased right now.', 'error' );
+      }
+    }
+
+    updateAddToCartButtonState( entry );
+  }
+
+  function getAddToCartEndpoint() {
+    if ( window.wc_add_to_cart_params && window.wc_add_to_cart_params.wc_ajax_url ) {
+      return window.wc_add_to_cart_params.wc_ajax_url.replace( '%%endpoint%%', 'add_to_cart' );
+    }
+
+    if ( window.ajaxurl ) {
+      const ajaxUrl = String( window.ajaxurl );
+
+      if ( ajaxUrl.includes( '%%endpoint%%' ) ) {
+        return ajaxUrl.replace( '%%endpoint%%', 'add_to_cart' );
+      }
+
+      return ajaxUrl;
+    }
+
+    try {
+      const url = new URL( window.location.href );
+      url.searchParams.set( 'wc-ajax', 'add_to_cart' );
+      return url.toString();
+    } catch ( error ) {
+      return '?wc-ajax=add_to_cart';
+    }
+  }
+
+  function buildAddToCartPayload( entry ) {
+    const params = new URLSearchParams();
+
+    const nonce =
+      ( window.wc_add_to_cart_params && window.wc_add_to_cart_params.add_to_cart_nonce ) ||
+      ( window.tcgKioskData && window.tcgKioskData.commerce && window.tcgKioskData.commerce.addToCartNonce ) ||
+      '';
+
+    if ( ! entry ) {
+      return params;
+    }
+
+    if ( nonce ) {
+      params.set( 'security', nonce );
+    }
+
+    const parentId = entry.parentId || entry.productId || 0;
+    const productId = entry.productId || parentId || entry.variationId || 0;
+
+    if ( productId ) {
+      params.set( 'product_id', String( productId ) );
+    }
+
+    if ( parentId || productId ) {
+      params.set( 'add-to-cart', String( parentId || productId ) );
+    }
+
+    if ( entry.variationId ) {
+      params.set( 'variation_id', String( entry.variationId ) );
+    }
+
+    params.set( 'quantity', '1' );
+
+    if ( entry.attributes && 'object' === typeof entry.attributes ) {
+      Object.keys( entry.attributes ).forEach( ( key ) => {
+        const value = entry.attributes[ key ];
+
+        if ( ! key || ! value ) {
+          return;
+        }
+
+        params.set( key, value );
+      } );
+    }
+
+    return params;
+  }
+
+  function updateAddToCartLoading( loading ) {
+    isAddingToCart = !! loading;
+
+    if ( ! cardOverlayAddToCart ) {
+      return;
+    }
+
+    if ( isAddingToCart ) {
+      cardOverlayAddToCart.textContent = i18n.addingToCart || 'Adding…';
+      cardOverlayAddToCart.disabled = true;
+      return;
+    }
+
+    const entry = currentCommerceEntries[ currentCommerceSelectionIndex ] || null;
+    cardOverlayAddToCart.textContent = i18n.addToCart || 'Add to cart';
+    cardOverlayAddToCart.disabled = ! isEntryPurchasable( entry );
+  }
+
+  function formatAddedMessage( entry ) {
+    const template = i18n.addedToCart || '%s was added to your cart.';
+    const name = getEntryDisplayName( entry ) || ( currentCommerceCard && currentCommerceCard.name ) || '';
+
+    if ( template.includes( '%s' ) && name ) {
+      return template.replace( '%s', name );
+    }
+
+    return template;
+  }
+
+  function setupCommerceSection( card ) {
+    resetCommerceSection();
+
+    if ( ! card || ! Array.isArray( card.products ) || ! card.products.length ) {
+      return;
+    }
+
+    const entries = card.products
+      .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
+      .filter( Boolean );
+
+    if ( ! entries.length ) {
+      return;
+    }
+
+    currentCommerceCard = card;
+    currentCommerceEntries = entries;
+
+    debugCommerceEntries( card, entries, 'raw entries' );
+
+    if ( cardOverlayCommerce ) {
+      cardOverlayCommerce.hidden = false;
+    }
+
+    if ( cardOverlayVariantLabel && i18n.chooseVariant ) {
+      cardOverlayVariantLabel.textContent = i18n.chooseVariant;
+    }
+
+    if ( cardOverlayVariantOptions ) {
+      cardOverlayVariantOptions.innerHTML = '';
+    }
+
+    cardOverlayVariantButtons = [];
+
+    if ( cardOverlayVariantContainer && cardOverlayVariantOptions ) {
+      const labelText =
+        ( cardOverlayVariantLabel && cardOverlayVariantLabel.textContent ) ||
+        i18n.chooseVariant ||
+        'Choose a version';
+
+      const forceButtons = shouldForceVariantButtons();
+      const indexedEntries = entries.map( ( entry, index ) => ( { entry, index } ) );
+
+      const purchasableEntries = indexedEntries.filter( ( payload ) => {
+        if ( ! payload || ! payload.entry ) {
+          return false;
+        }
+
+        return isEntryPurchasable( payload.entry );
+      } );
+
+      debugCommerceEntries(
+        card,
+        purchasableEntries.map( ( payload ) => payload.entry ),
+        'purchasable entries'
+      );
+
+      const variationEntries = purchasableEntries.filter( ( payload ) => {
+        const { entry } = payload;
+
+        if ( ! entry ) {
+          return false;
+        }
+
+        if ( 'variation' === entry.type ) {
+          return true;
+        }
+
+        if ( entry.variationId && Number.isFinite( Number( entry.variationId ) ) ) {
+          return Number( entry.variationId ) > 0;
+        }
+
+        return false;
+      } );
+
+      let buttonEntries;
+
+      if ( forceButtons ) {
+        buttonEntries = indexedEntries;
+      } else if ( variationEntries.length > 0 ) {
+        buttonEntries = variationEntries;
+      } else if ( purchasableEntries.length > 1 ) {
+        buttonEntries = purchasableEntries;
+      } else {
+        buttonEntries = [];
+      }
+
+      debugCommerceEntries(
+        card,
+        buttonEntries.map( ( payload ) => payload.entry ),
+        'button entries'
+      );
+
+      if ( cardOverlayVariantContainer.dataset ) {
+        cardOverlayVariantContainer.dataset.entryTotal = String( entries.length );
+        cardOverlayVariantContainer.dataset.purchasableCount = String( purchasableEntries.length );
+        cardOverlayVariantContainer.dataset.buttonCount = String( buttonEntries.length );
+        cardOverlayVariantContainer.dataset.debugMode = forceButtons ? 'forced' : 'auto';
+      }
+
+      withCommerceDebug( () => {
+        if ( window.console && window.console.info ) {
+          window.console.info( '[TCG Kiosk] Variant selection summary', {
+            card: card && card.name ? card.name : null,
+            cardId: card && card.id ? card.id : null,
+            totalEntries: entries.length,
+            purchasableEntries: purchasableEntries.length,
+            buttonEntries: buttonEntries.length,
+            mode: forceButtons ? 'forced' : 'auto',
+          } );
+        }
+      } );
+
+      buttonEntries.forEach( ( payload ) => {
+        const { entry, index } = payload;
+        const button = document.createElement( 'button' );
+        button.type = 'button';
+        button.className = 'tcg-kiosk__card-overlay-variant-button';
+        button.textContent = getEntryOptionLabel( entry, index );
+        button.dataset.entryIndex = String( index );
+        button.setAttribute( 'aria-pressed', 'false' );
+
+        const isPurchasable = isEntryPurchasable( entry );
+        button.dataset.purchasable = isPurchasable ? 'true' : 'false';
+
+        if ( entry && entry.stockStatus ) {
+          button.dataset.stockStatus = entry.stockStatus;
+        }
+
+        if ( entry && Array.isArray( entry.matchedIdentifiers ) && entry.matchedIdentifiers.length ) {
+          button.dataset.identifiers = entry.matchedIdentifiers.join( ', ' );
+        }
+
+        if ( ! isPurchasable ) {
+          const hints = [];
+
+          if ( false === entry.isPurchasable ) {
+            hints.push( i18n.notPurchasable || 'This product cannot be purchased right now.' );
+          }
+
+          if ( false === entry.isInStock ) {
+            hints.push( i18n.outOfStock || 'Out of stock' );
+          }
+
+          if ( entry && entry.stockStatus && ! hints.includes( entry.stockStatus ) ) {
+            hints.push( entry.stockStatus );
+          }
+
+          if ( hints.length ) {
+            button.title = hints.join( ' · ' );
+          }
+
+          if ( forceButtons ) {
+            button.setAttribute( 'aria-disabled', 'true' );
+          } else {
+            button.disabled = true;
+          }
+        } else if ( forceButtons ) {
+          button.removeAttribute( 'aria-disabled' );
+        }
+
+        button.addEventListener( 'click', ( event ) => {
+          event.preventDefault();
+
+          if ( isAddingToCart ) {
+            return;
+          }
+
+          updateCommerceSelection( index );
+        } );
+
+        cardOverlayVariantOptions.appendChild( button );
+        cardOverlayVariantButtons.push( button );
+      } );
+
+      if ( buttonEntries.length > 0 ) {
+        if ( labelText ) {
+          cardOverlayVariantOptions.setAttribute( 'aria-label', labelText );
+        } else {
+          cardOverlayVariantOptions.removeAttribute( 'aria-label' );
+        }
+      } else {
+        cardOverlayVariantOptions.removeAttribute( 'aria-label' );
+      }
+
+      cardOverlayVariantContainer.hidden = buttonEntries.length <= 0;
+
+      if ( ! buttonEntries.length ) {
+        debugCommerceEntries( card, entries, 'no buttons rendered' );
+      }
+    }
+
+    let defaultIndex = entries.findIndex( ( entry ) => isEntryPurchasable( entry ) );
+
+    if ( defaultIndex < 0 ) {
+      defaultIndex = 0;
+    }
+
+    updateCommerceSelection( defaultIndex );
+  }
+
+  async function handleAddToCartClick() {
+    if ( isAddingToCart ) {
+      return;
+    }
+
+    const entry = currentCommerceEntries[ currentCommerceSelectionIndex ] || null;
+
+    if ( ! entry || ! isEntryPurchasable( entry ) ) {
+      return;
+    }
+
+    updateAddToCartLoading( true );
+    showCommerceMessage( '', '' );
+
+    const endpoint = getAddToCartEndpoint();
+    const payload = buildAddToCartPayload( entry );
+    let responseData = null;
+
+    try {
+      const response = await fetch( endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Accept: 'application/json, */*;q=0.1',
+        },
+        credentials: 'same-origin',
+        body: payload.toString(),
+      } );
+
+      if ( ! response.ok ) {
+        throw new Error( 'Request failed' );
+      }
+
+      responseData = await response.json().catch( () => null );
+
+      if ( responseData && responseData.error ) {
+        showCommerceMessage( getAddToCartErrorMessage( responseData, entry ), 'error' );
+        return;
+      }
+
+      showCommerceMessage( formatAddedMessage( entry ), 'success' );
+
+      try {
+        document.body.dispatchEvent(
+          new CustomEvent( 'tcgKioskCardAddedToCart', {
+            detail: { card: currentCommerceCard, product: entry, response: responseData },
+          } )
+        );
+      } catch ( error ) {
+        // Ignore dispatch errors.
+      }
+
+      if ( responseData && responseData.fragments ) {
+        try {
+          document.body.dispatchEvent( new CustomEvent( 'added_to_cart', { detail: responseData } ) );
+        } catch ( error ) {
+          // Ignore dispatch errors.
+        }
+
+        if ( window.jQuery ) {
+          window.jQuery( document.body ).trigger( 'added_to_cart', [ responseData.fragments, responseData.cart_hash, null ] );
+        }
+      }
+    } catch ( error ) {
+      console.error( error );
+      showCommerceMessage( i18n.addToCartError || 'Unable to add this item to your cart.', 'error' );
+    } finally {
+      updateAddToCartLoading( false );
+      updateAddToCartButtonState( currentCommerceEntries[ currentCommerceSelectionIndex ] || null );
+    }
   }
 
   function openCardOverlay( card, triggerElement ) {
@@ -887,6 +2011,8 @@ CSS;
         cardOverlayDetails.appendChild( placeholderDefinition );
       }
     }
+
+    setupCommerceSection( card );
 
     if ( cardOverlayImage ) {
       const preferredImage = card.imageFullUrl || card.imageUrl || '';
@@ -1171,13 +2297,66 @@ CSS;
     } );
   }
 
-  function createTypeButton( value, label ) {
+  function createTypeButton( value, label, rowKey ) {
     const button = document.createElement( 'button' );
     button.type = 'button';
     button.className = 'tcg-kiosk__type-button';
     button.dataset.value = value;
-    button.textContent = label;
     button.setAttribute( 'aria-pressed', 'false' );
+    button.title = label;
+
+    const iconUrl = getTypeIconUrl( label, value );
+    const normalizedIconKey = normalizeTypeIconKey( value ) || normalizeTypeIconKey( label );
+    const normalizedRowKey = normalizeTypeIconKey( rowKey );
+    const isColorSwatch = normalizedRowKey === 'colors';
+
+    if ( isColorSwatch ) {
+      button.classList.add( 'tcg-kiosk__type-button--color-swatch' );
+      button.setAttribute( 'aria-label', label );
+
+      const normalizedValueKey = normalizedIconKey;
+      if ( normalizedValueKey ) {
+        const swatchColor = ONE_PIECE_COLOR_SWATCHES.get( normalizedValueKey );
+        const swatchForeground = ONE_PIECE_COLOR_FOREGROUND.get( normalizedValueKey );
+
+        if ( swatchColor ) {
+          button.style.setProperty( '--tcg-kiosk-swatch-color', swatchColor );
+        }
+
+        if ( swatchForeground ) {
+          button.style.setProperty( '--tcg-kiosk-swatch-foreground', swatchForeground );
+        }
+      }
+
+      const hiddenLabel = document.createElement( 'span' );
+      hiddenLabel.className = 'tcg-kiosk__type-button-text';
+      hiddenLabel.textContent = label;
+      button.appendChild( hiddenLabel );
+    } else if ( iconUrl ) {
+      button.classList.add( 'tcg-kiosk__type-button--has-icon' );
+
+      if ( normalizedIconKey && LARGE_TYPE_ICON_KEYS.has( normalizedIconKey ) ) {
+        button.classList.add( 'tcg-kiosk__type-button--large-icon' );
+      } else if ( normalizedIconKey && COMPACT_TYPE_ICON_KEYS.has( normalizedIconKey ) ) {
+        button.classList.add( 'tcg-kiosk__type-button--compact-icon' );
+      }
+
+      const image = document.createElement( 'img' );
+      image.className = 'tcg-kiosk__type-button-image';
+      image.src = iconUrl;
+      image.alt = '';
+      image.loading = 'lazy';
+      image.setAttribute( 'aria-hidden', 'true' );
+      button.appendChild( image );
+
+      const hiddenLabel = document.createElement( 'span' );
+      hiddenLabel.className = 'tcg-kiosk__type-button-text';
+      hiddenLabel.textContent = label;
+      button.appendChild( hiddenLabel );
+    } else {
+      button.textContent = label;
+    }
+
     button.addEventListener( 'click', () => {
       if ( value && selectedTypeValue === value ) {
         selectedTypeValue = '';
@@ -1241,8 +2420,8 @@ CSS;
     typeOptionsContainer.innerHTML = '';
     typeFilterWrapper.hidden = true;
 
-    const defaultLabel = typeFilterWrapper.dataset.defaultLabel || 'Type';
-    typeFilterLabel.textContent = defaultLabel;
+    const defaultLabel = DEFAULT_TYPE_LABEL;
+    currentTypeLabel = defaultLabel;
 
     const typeValue = gameSelect.value;
 
@@ -1257,11 +2436,12 @@ CSS;
     }
 
     const label = selected.typeLabel || defaultLabel;
-    typeFilterLabel.textContent = label;
+    currentTypeLabel = label;
 
     const presetOptions = Array.isArray( selected.typeOptions ) ? selected.typeOptions : [];
     const template = i18n.allTypeTemplate || 'All %s';
-    const allLabel = template.includes( '%s' ) ? template.replace( '%s', label ) : template;
+    const allLabel = template.includes( '%s' ) ? template.replace( '%s', currentTypeLabel ) : template;
+    const includeAllOption = selected.typeIncludeAllOption !== false;
     const options = [];
 
     if ( presetOptions.length ) {
@@ -1281,7 +2461,21 @@ CSS;
           return;
         }
 
-        options.push( { value, label: option.label || value } );
+        const entry = { value, label: option.label || value };
+
+        if ( Object.prototype.hasOwnProperty.call( option, 'row' ) ) {
+          const rawRow = option.row;
+
+          if ( 'string' === typeof rawRow || 'number' === typeof rawRow ) {
+            const normalizedRow = String( rawRow ).trim();
+
+            if ( normalizedRow ) {
+              entry.row = normalizedRow;
+            }
+          }
+        }
+
+        options.push( entry );
       } );
     } else {
       const typeValues = new Set();
@@ -1311,10 +2505,56 @@ CSS;
       return;
     }
 
-    typeOptionsContainer.appendChild( createTypeButton( '', allLabel ) );
+    const rowContainers = new Map();
+    const DEFAULT_ROW_KEY = '__default__';
+
+    function normalizeRowKey( value ) {
+      if ( 'string' === typeof value || 'number' === typeof value ) {
+        const normalized = String( value ).trim();
+
+        if ( normalized ) {
+          return normalized;
+        }
+      }
+
+      return '';
+    }
+
+    function appendToRow( element, rawRowKey ) {
+      const normalizedKey = normalizeRowKey( rawRowKey );
+      const resolvedKey = normalizedKey || DEFAULT_ROW_KEY;
+      let row = rowContainers.get( resolvedKey );
+
+      if ( ! row ) {
+        row = document.createElement( 'div' );
+        row.className = 'tcg-kiosk__type-row';
+
+        if ( resolvedKey !== DEFAULT_ROW_KEY ) {
+          const modifier = normalizeTypeIconKey( resolvedKey );
+
+          if ( modifier ) {
+            row.classList.add( `tcg-kiosk__type-row--${modifier}` );
+          }
+
+          row.dataset.rowKey = resolvedKey;
+        }
+
+        rowContainers.set( resolvedKey, row );
+      }
+
+      if ( ! row.isConnected ) {
+        typeOptionsContainer.appendChild( row );
+      }
+
+      row.appendChild( element );
+    }
+
+    if ( includeAllOption ) {
+      appendToRow( createTypeButton( '', allLabel, DEFAULT_ROW_KEY ), DEFAULT_ROW_KEY );
+    }
 
     options.forEach( ( option ) => {
-      typeOptionsContainer.appendChild( createTypeButton( option.value, option.label ) );
+      appendToRow( createTypeButton( option.value, option.label, option.row ), option.row );
     } );
 
     updateActiveTypeButton();
@@ -1567,6 +2807,13 @@ CSS;
     cardOverlayClose.addEventListener( 'click', () => closeCardOverlay() );
   }
 
+  if ( cardOverlayAddToCart ) {
+    cardOverlayAddToCart.addEventListener( 'click', ( event ) => {
+      event.preventDefault();
+      handleAddToCartClick();
+    } );
+  }
+
   gameSelect.addEventListener( 'change', () => {
     hasInteracted = true;
     currentPage = 1;
@@ -1651,26 +2898,32 @@ JS;
                     <div class="tcg-kiosk__card-overlay-meta">
                         <h2 id="tcg-kiosk-detail-title" class="tcg-kiosk__card-overlay-title"></h2>
                         <dl id="tcg-kiosk-detail-metadata" class="tcg-kiosk__card-overlay-details"></dl>
+                        <div id="tcg-kiosk-card-overlay-commerce" class="tcg-kiosk__card-overlay-commerce" hidden>
+                            <div id="tcg-kiosk-card-overlay-price" class="tcg-kiosk__card-overlay-price"></div>
+                            <div id="tcg-kiosk-card-overlay-variant" class="tcg-kiosk__card-overlay-variant" hidden>
+                                <p id="tcg-kiosk-card-overlay-variant-label" class="tcg-kiosk__card-overlay-variant-label"><?php esc_html_e( 'Choose a version', 'tcg-kiosk-filter' ); ?></p>
+                                <div id="tcg-kiosk-card-overlay-variant-options" class="tcg-kiosk__card-overlay-variant-options" role="group" aria-label="<?php esc_attr_e( 'Choose a version', 'tcg-kiosk-filter' ); ?>"></div>
+                            </div>
+                            <button type="button" id="tcg-kiosk-card-overlay-add-to-cart" class="tcg-kiosk__card-overlay-add-to-cart" disabled><?php esc_html_e( 'Add to cart', 'tcg-kiosk-filter' ); ?></button>
+                            <p id="tcg-kiosk-card-overlay-commerce-message" class="tcg-kiosk__card-overlay-commerce-message" role="status" aria-live="polite" hidden></p>
+                        </div>
                     </div>
                 </div>
             </div>
             <header class="tcg-kiosk__header">
                 <div class="tcg-kiosk__filters" role="group" aria-label="<?php esc_attr_e( 'Filter cards', 'tcg-kiosk-filter' ); ?>">
                     <label>
-                        <span><?php esc_html_e( 'Trading Card Game', 'tcg-kiosk-filter' ); ?></span>
-                        <select id="tcg-kiosk-game" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'Choose a game', 'tcg-kiosk-filter' ); ?>">
+                        <select id="tcg-kiosk-game" class="tcg-kiosk__select" aria-label="<?php esc_attr_e( 'Trading Card Game', 'tcg-kiosk-filter' ); ?>" data-placeholder="<?php echo esc_attr__( 'Choose a game', 'tcg-kiosk-filter' ); ?>">
                             <option value="" disabled selected hidden><?php esc_html_e( 'Choose a game', 'tcg-kiosk-filter' ); ?></option>
                         </select>
                     </label>
                     <label>
-                        <span><?php esc_html_e( 'Set', 'tcg-kiosk-filter' ); ?></span>
-                        <select id="tcg-kiosk-set" class="tcg-kiosk__select" data-placeholder="<?php echo esc_attr__( 'All Sets', 'tcg-kiosk-filter' ); ?>" disabled>
+                        <select id="tcg-kiosk-set" class="tcg-kiosk__select" aria-label="<?php esc_attr_e( 'Set', 'tcg-kiosk-filter' ); ?>" data-placeholder="<?php echo esc_attr__( 'All Sets', 'tcg-kiosk-filter' ); ?>" disabled>
                             <option value=""><?php esc_html_e( 'All Sets', 'tcg-kiosk-filter' ); ?></option>
                         </select>
                     </label>
                 </div>
-                <div id="tcg-kiosk-type-filter" class="tcg-kiosk__type-filter" role="group" aria-labelledby="tcg-kiosk-type-label" data-default-label="<?php echo esc_attr__( 'Type', 'tcg-kiosk-filter' ); ?>" hidden>
-                    <span id="tcg-kiosk-type-label" class="tcg-kiosk__type-filter-label"><?php esc_html_e( 'Type', 'tcg-kiosk-filter' ); ?></span>
+                <div id="tcg-kiosk-type-filter" class="tcg-kiosk__type-filter" role="group" aria-label="<?php esc_attr_e( 'Type', 'tcg-kiosk-filter' ); ?>" data-default-label="<?php echo esc_attr__( 'Type', 'tcg-kiosk-filter' ); ?>" hidden>
                     <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
                 </div>
                 <div class="tcg-kiosk__actions">
