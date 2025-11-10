@@ -982,6 +982,116 @@ CSS;
     [ 'yellow', '#1d2327' ],
   ] );
 
+  function getCommerceDebugMode() {
+    const value = window.tcgKioskDebugCommerce;
+
+    if ( 'string' === typeof value ) {
+      return value.trim().toLowerCase();
+    }
+
+    if ( value ) {
+      return 'log';
+    }
+
+    return '';
+  }
+
+  function isCommerceDebugging() {
+    const mode = getCommerceDebugMode();
+
+    return !! mode && 'off' !== mode;
+  }
+
+  function shouldForceVariantButtons() {
+    const mode = getCommerceDebugMode();
+
+    return [ 'showall', 'force', 'all', 'buttons' ].includes( mode );
+  }
+
+  function withCommerceDebug( callback ) {
+    if ( ! isCommerceDebugging() || 'function' !== typeof callback ) {
+      return;
+    }
+
+    try {
+      callback();
+    } catch ( error ) {
+      if ( window.console && window.console.error ) {
+        window.console.error( error );
+      }
+    }
+  }
+
+  function formatCommerceEntryForDebug( entry, index ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return { index, note: 'invalid entry' };
+    }
+
+    const matched = Array.isArray( entry.matchedIdentifiers )
+      ? entry.matchedIdentifiers.join( ', ' )
+      : '';
+
+    return {
+      index,
+      type: entry.type || '',
+      productId: entry.productId || '',
+      variationId: entry.variationId || '',
+      sku: entry.sku || '',
+      isPurchasable: !! entry.isPurchasable,
+      isInStock: !! entry.isInStock,
+      backordersAllowed: !! entry.backordersAllowed,
+      stockStatus: entry.stockStatus || '',
+      price: entry.price || '',
+      matched,
+    };
+  }
+
+  function debugCommerceEntries( card, entries, context ) {
+    withCommerceDebug( () => {
+      if ( ! window.console ) {
+        return;
+      }
+
+      const consoleRef = window.console;
+      const cardName = card && card.name ? card.name : 'Unknown card';
+      const headingParts = [ '[TCG Kiosk] Commerce entries' ];
+
+      if ( context ) {
+        headingParts.push( '(' + context + ')' );
+      }
+
+      headingParts.push( '–', cardName );
+
+      const heading = headingParts.join( ' ' );
+
+      if ( consoleRef.groupCollapsed ) {
+        consoleRef.groupCollapsed( heading );
+      } else if ( consoleRef.group ) {
+        consoleRef.group( heading );
+      }
+
+      const payload = {
+        cardId: card && card.id ? card.id : null,
+        totalEntries: Array.isArray( entries ) ? entries.length : 0,
+        context,
+      };
+
+      if ( consoleRef.log ) {
+        consoleRef.log( payload );
+      }
+
+      if ( consoleRef.table && Array.isArray( entries ) ) {
+        consoleRef.table( entries.map( formatCommerceEntryForDebug ) );
+      } else if ( consoleRef.log && Array.isArray( entries ) ) {
+        consoleRef.log( entries.map( formatCommerceEntryForDebug ) );
+      }
+
+      if ( consoleRef.groupEnd ) {
+        consoleRef.groupEnd();
+      }
+    } );
+  }
+
   if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
   }
@@ -1212,6 +1322,12 @@ CSS;
 
     if ( cardOverlayVariantContainer ) {
       cardOverlayVariantContainer.hidden = true;
+      if ( cardOverlayVariantContainer.dataset ) {
+        delete cardOverlayVariantContainer.dataset.entryTotal;
+        delete cardOverlayVariantContainer.dataset.purchasableCount;
+        delete cardOverlayVariantContainer.dataset.buttonCount;
+        delete cardOverlayVariantContainer.dataset.debugMode;
+      }
     }
 
     if ( cardOverlayVariantLabel && i18n.chooseVariant ) {
@@ -1523,6 +1639,8 @@ CSS;
     currentCommerceCard = card;
     currentCommerceEntries = entries;
 
+    debugCommerceEntries( card, entries, 'raw entries' );
+
     if ( cardOverlayCommerce ) {
       cardOverlayCommerce.hidden = false;
     }
@@ -1543,15 +1661,22 @@ CSS;
         i18n.chooseVariant ||
         'Choose a version';
 
-      const purchasableEntries = entries
-        .map( ( entry, index ) => ( { entry, index } ) )
-        .filter( ( payload ) => {
-          if ( ! payload || ! payload.entry ) {
-            return false;
-          }
+      const forceButtons = shouldForceVariantButtons();
+      const indexedEntries = entries.map( ( entry, index ) => ( { entry, index } ) );
 
-          return isEntryPurchasable( payload.entry );
-        } );
+      const purchasableEntries = indexedEntries.filter( ( payload ) => {
+        if ( ! payload || ! payload.entry ) {
+          return false;
+        }
+
+        return isEntryPurchasable( payload.entry );
+      } );
+
+      debugCommerceEntries(
+        card,
+        purchasableEntries.map( ( payload ) => payload.entry ),
+        'purchasable entries'
+      );
 
       const variationEntries = purchasableEntries.filter( ( payload ) => {
         const { entry } = payload;
@@ -1571,7 +1696,43 @@ CSS;
         return false;
       } );
 
-      const buttonEntries = variationEntries.length > 0 ? variationEntries : purchasableEntries.length > 1 ? purchasableEntries : [];
+      let buttonEntries;
+
+      if ( forceButtons ) {
+        buttonEntries = indexedEntries;
+      } else if ( variationEntries.length > 0 ) {
+        buttonEntries = variationEntries;
+      } else if ( purchasableEntries.length > 1 ) {
+        buttonEntries = purchasableEntries;
+      } else {
+        buttonEntries = [];
+      }
+
+      debugCommerceEntries(
+        card,
+        buttonEntries.map( ( payload ) => payload.entry ),
+        'button entries'
+      );
+
+      if ( cardOverlayVariantContainer.dataset ) {
+        cardOverlayVariantContainer.dataset.entryTotal = String( entries.length );
+        cardOverlayVariantContainer.dataset.purchasableCount = String( purchasableEntries.length );
+        cardOverlayVariantContainer.dataset.buttonCount = String( buttonEntries.length );
+        cardOverlayVariantContainer.dataset.debugMode = forceButtons ? 'forced' : 'auto';
+      }
+
+      withCommerceDebug( () => {
+        if ( window.console && window.console.info ) {
+          window.console.info( '[TCG Kiosk] Variant selection summary', {
+            card: card && card.name ? card.name : null,
+            cardId: card && card.id ? card.id : null,
+            totalEntries: entries.length,
+            purchasableEntries: purchasableEntries.length,
+            buttonEntries: buttonEntries.length,
+            mode: forceButtons ? 'forced' : 'auto',
+          } );
+        }
+      } );
 
       buttonEntries.forEach( ( payload ) => {
         const { entry, index } = payload;
@@ -1581,6 +1742,46 @@ CSS;
         button.textContent = getEntryOptionLabel( entry, index );
         button.dataset.entryIndex = String( index );
         button.setAttribute( 'aria-pressed', 'false' );
+
+        const isPurchasable = isEntryPurchasable( entry );
+        button.dataset.purchasable = isPurchasable ? 'true' : 'false';
+
+        if ( entry && entry.stockStatus ) {
+          button.dataset.stockStatus = entry.stockStatus;
+        }
+
+        if ( entry && Array.isArray( entry.matchedIdentifiers ) && entry.matchedIdentifiers.length ) {
+          button.dataset.identifiers = entry.matchedIdentifiers.join( ', ' );
+        }
+
+        if ( ! isPurchasable ) {
+          const hints = [];
+
+          if ( false === entry.isPurchasable ) {
+            hints.push( i18n.notPurchasable || 'This product cannot be purchased right now.' );
+          }
+
+          if ( false === entry.isInStock ) {
+            hints.push( i18n.outOfStock || 'Out of stock' );
+          }
+
+          if ( entry && entry.stockStatus && ! hints.includes( entry.stockStatus ) ) {
+            hints.push( entry.stockStatus );
+          }
+
+          if ( hints.length ) {
+            button.title = hints.join( ' · ' );
+          }
+
+          if ( forceButtons ) {
+            button.setAttribute( 'aria-disabled', 'true' );
+          } else {
+            button.disabled = true;
+          }
+        } else if ( forceButtons ) {
+          button.removeAttribute( 'aria-disabled' );
+        }
+
         button.addEventListener( 'click', ( event ) => {
           event.preventDefault();
 
@@ -1606,6 +1807,10 @@ CSS;
       }
 
       cardOverlayVariantContainer.hidden = buttonEntries.length <= 0;
+
+      if ( ! buttonEntries.length ) {
+        debugCommerceEntries( card, entries, 'no buttons rendered' );
+      }
     }
 
     let defaultIndex = entries.findIndex( ( entry ) => isEntryPurchasable( entry ) );
