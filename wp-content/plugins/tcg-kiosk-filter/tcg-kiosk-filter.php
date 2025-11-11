@@ -1958,23 +1958,37 @@ CSS;
       cardOverlayVariantLabel.textContent = i18n.chooseVariant;
     }
 
+    const shouldShowVariantSelect = ( () => {
+      if ( entries.length > 1 ) {
+        return true;
+      }
+
+      if ( 1 === entries.length ) {
+        const onlyEntry = entries[ 0 ];
+
+        return isLikelyVariationObject( onlyEntry );
+      }
+
+      return false;
+    } )();
+
     if ( cardOverlayVariantSelect ) {
-      cardOverlayVariantSelect.disabled = false;
+      cardOverlayVariantSelect.disabled = ! shouldShowVariantSelect;
       cardOverlayVariantSelect.innerHTML = '';
+
+      if ( shouldShowVariantSelect ) {
+        entries.forEach( ( entry, index ) => {
+          const option = document.createElement( 'option' );
+          option.value = String( index );
+          option.textContent = getEntryOptionLabel( entry, index );
+          option.disabled = ! isEntryPurchasable( entry );
+          cardOverlayVariantSelect.appendChild( option );
+        } );
+      }
     }
 
-    if ( entries.length > 1 && cardOverlayVariantContainer && cardOverlayVariantSelect ) {
-      entries.forEach( ( entry, index ) => {
-        const option = document.createElement( 'option' );
-        option.value = String( index );
-        option.textContent = getEntryOptionLabel( entry, index );
-        option.disabled = ! isEntryPurchasable( entry );
-        cardOverlayVariantSelect.appendChild( option );
-      } );
-
-      cardOverlayVariantContainer.hidden = false;
-    } else if ( cardOverlayVariantContainer ) {
-      cardOverlayVariantContainer.hidden = true;
+    if ( cardOverlayVariantContainer ) {
+      cardOverlayVariantContainer.hidden = ! shouldShowVariantSelect;
     }
 
     let defaultIndex = entries.findIndex( ( entry ) => isEntryPurchasable( entry ) );
