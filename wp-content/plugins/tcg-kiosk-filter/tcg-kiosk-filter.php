@@ -1062,6 +1062,7 @@ CSS;
   let currentPage = 1;
   let selectedTypeValue = '';
   let lastFocusedCard = null;
+  let pendingPriceBadgeAnimationFrame = null;
 
   function applyPageSizeLayout() {
     const normalized = [ 10, 12, 16, 20 ].includes( cardsPerPage ) ? cardsPerPage : 10;
@@ -2900,6 +2901,58 @@ CSS;
     return badge;
   }
 
+  function adjustCardPriceBadgePosition( badge ) {
+    if ( ! badge ) {
+      return;
+    }
+
+    const card = badge.closest( '.tcg-kiosk__card' );
+
+    if ( ! card ) {
+      return;
+    }
+
+    const image = card.querySelector( 'img' );
+
+    if ( ! image ) {
+      return;
+    }
+
+    const cardRect = card.getBoundingClientRect();
+    const imageRect = image.getBoundingClientRect();
+
+    if ( ! cardRect.width || ! imageRect.width ) {
+      return;
+    }
+
+    const horizontalGap = Math.max( 0, ( cardRect.width - imageRect.width ) / 2 );
+    const verticalGap = Math.max( 0, ( cardRect.height - imageRect.height ) / 2 );
+
+    badge.style.right = `${ horizontalGap + 8 }px`;
+    badge.style.top = `${ verticalGap + 8 }px`;
+  }
+
+  function updateCardPriceBadgePositions() {
+    if ( ! resultsContainer ) {
+      return;
+    }
+
+    const badges = resultsContainer.querySelectorAll( '.tcg-kiosk__card-price' );
+
+    badges.forEach( ( badge ) => adjustCardPriceBadgePosition( badge ) );
+  }
+
+  function scheduleCardPriceBadgeUpdate() {
+    if ( pendingPriceBadgeAnimationFrame ) {
+      window.cancelAnimationFrame( pendingPriceBadgeAnimationFrame );
+    }
+
+    pendingPriceBadgeAnimationFrame = window.requestAnimationFrame( () => {
+      pendingPriceBadgeAnimationFrame = null;
+      updateCardPriceBadgePositions();
+    } );
+  }
+
   function renderCards() {
     applyPageSizeLayout();
 
@@ -2982,12 +3035,21 @@ CSS;
 
       if ( priceBadge ) {
         item.appendChild( priceBadge );
+        const handleBadgePositionUpdate = () => scheduleCardPriceBadgeUpdate();
+
+        if ( img.complete ) {
+          handleBadgePositionUpdate();
+        }
+
+        img.addEventListener( 'load', handleBadgePositionUpdate );
+        img.addEventListener( 'error', handleBadgePositionUpdate );
       }
 
       fragment.appendChild( item );
     } );
 
     resultsContainer.appendChild( fragment );
+    scheduleCardPriceBadgeUpdate();
     renderPagination( totalPages );
   }
 
@@ -3096,6 +3158,8 @@ CSS;
     paginationContainer.appendChild( status );
     paginationContainer.appendChild( nextButton );
   }
+
+  window.addEventListener( 'resize', scheduleCardPriceBadgeUpdate );
 
   if ( cardOverlay ) {
     cardOverlay.addEventListener( 'click', ( event ) => {
