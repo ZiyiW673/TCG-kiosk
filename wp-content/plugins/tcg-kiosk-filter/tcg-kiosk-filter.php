@@ -843,6 +843,7 @@ header {
     height: 100%;
     min-height: 0;
     cursor: pointer;
+    position: relative;
 }
 
 .tcg-kiosk__card img {
@@ -857,6 +858,22 @@ header {
 .tcg-kiosk__card:focus-visible {
     outline: 3px solid #2271b1;
     outline-offset: 4px;
+}
+
+.tcg-kiosk__card-price {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background-color: rgba(29, 35, 39, 0.88);
+    color: #fff;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    z-index: 2;
 }
 
 .tcg-kiosk__empty {
@@ -2776,6 +2793,111 @@ CSS;
     return '';
   }
 
+  function getEntryNumericPrice( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return null;
+    }
+
+    const candidates = [ entry.price, entry.salePrice, entry.regularPrice ];
+
+    for ( const candidate of candidates ) {
+      if ( 'number' === typeof candidate && Number.isFinite( candidate ) ) {
+        return candidate;
+      }
+
+      if ( 'string' === typeof candidate ) {
+        const normalized = candidate.replace( /,/g, '' ).trim();
+
+        if ( ! normalized ) {
+          continue;
+        }
+
+        const parsed = Number.parseFloat( normalized );
+
+        if ( Number.isFinite( parsed ) ) {
+          return parsed;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function formatPriceAmount( amount, currencySymbol ) {
+    if ( 'number' !== typeof amount || ! Number.isFinite( amount ) ) {
+      return '';
+    }
+
+    const hasFraction = Math.abs( amount - Math.trunc( amount ) ) > 0.0001;
+    const fractionDigits = hasFraction ? 2 : 0;
+    let formatted = '';
+
+    try {
+      formatted = amount.toLocaleString( undefined, {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+      } );
+    } catch ( error ) {
+      formatted = amount.toFixed( fractionDigits );
+    }
+
+    return `${ currencySymbol || '' }${ formatted }`;
+  }
+
+  function getCardPriceSummary( card ) {
+    if ( ! card || ! Array.isArray( card.products ) || ! card.products.length ) {
+      return '';
+    }
+
+    const entries = pruneVariationParentEntries( card.products );
+    const prices = [];
+    let currencySymbol = '';
+
+    entries.forEach( ( entry ) => {
+      if ( entry && ! currencySymbol && entry.currencySymbol ) {
+        currencySymbol = String( entry.currencySymbol );
+      }
+
+      const numericPrice = getEntryNumericPrice( entry );
+
+      if ( 'number' === typeof numericPrice ) {
+        prices.push( numericPrice );
+      }
+    } );
+
+    if ( ! prices.length ) {
+      return '';
+    }
+
+    prices.sort( ( a, b ) => a - b );
+    const min = prices[ 0 ];
+    const max = prices[ prices.length - 1 ];
+    const formattedMin = formatPriceAmount( min, currencySymbol );
+    const formattedMax = formatPriceAmount( max, currencySymbol );
+
+    if ( ! formattedMin || ! formattedMax ) {
+      return '';
+    }
+
+    const samePrice = Math.abs( max - min ) < 0.00001;
+
+    return samePrice ? formattedMin : `${ formattedMin } - ${ formattedMax }`;
+  }
+
+  function createCardPriceBadge( card ) {
+    const summary = getCardPriceSummary( card );
+
+    if ( ! summary ) {
+      return null;
+    }
+
+    const badge = document.createElement( 'span' );
+    badge.className = 'tcg-kiosk__card-price';
+    badge.textContent = summary;
+
+    return badge;
+  }
+
   function renderCards() {
     applyPageSizeLayout();
 
@@ -2853,6 +2975,12 @@ CSS;
       }
       img.addEventListener( 'error', () => handleImageError( img, card ) );
       item.appendChild( img );
+
+      const priceBadge = createCardPriceBadge( card );
+
+      if ( priceBadge ) {
+        item.appendChild( priceBadge );
+      }
 
       fragment.appendChild( item );
     } );
