@@ -2824,6 +2824,36 @@ CSS;
     return null;
   }
 
+  let currencySymbolDecoder = null;
+
+  function decodeCurrencySymbol( rawSymbol ) {
+    if ( 'string' !== typeof rawSymbol ) {
+      return '';
+    }
+
+    const trimmed = rawSymbol.trim();
+
+    if ( ! trimmed ) {
+      return '';
+    }
+
+    if ( trimmed.indexOf( '&' ) === -1 ) {
+      return trimmed;
+    }
+
+    if ( ! currencySymbolDecoder ) {
+      currencySymbolDecoder = document.createElement( 'div' );
+    }
+
+    currencySymbolDecoder.innerHTML = trimmed;
+
+    const decoded = ( currencySymbolDecoder.textContent || '' ).trim();
+
+    currencySymbolDecoder.textContent = '';
+
+    return decoded || trimmed;
+  }
+
   function formatPriceAmount( amount, currencySymbol ) {
     if ( 'number' !== typeof amount || ! Number.isFinite( amount ) ) {
       return '';
@@ -2842,9 +2872,7 @@ CSS;
       formatted = amount.toFixed( fractionDigits );
     }
 
-    const resolvedSymbol = ( 'string' === typeof currencySymbol && currencySymbol.trim() )
-      ? currencySymbol.trim()
-      : '$';
+    const resolvedSymbol = decodeCurrencySymbol( currencySymbol ) || '$';
 
     return `${ resolvedSymbol }${ formatted }`;
   }
