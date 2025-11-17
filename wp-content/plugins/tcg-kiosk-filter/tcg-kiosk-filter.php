@@ -2841,7 +2841,9 @@ CSS;
       formatted = amount.toFixed( fractionDigits );
     }
 
-    return `${ currencySymbol || '' }${ formatted }`;
+    // The kiosk badge should only display the numeric amount to avoid
+    // duplicated currency prefixes (e.g., leading "$" characters).
+    return formatted;
   }
 
   function getCardPriceSummary( card ) {
