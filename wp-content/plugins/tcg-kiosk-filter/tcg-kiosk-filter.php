@@ -784,6 +784,20 @@ header {
     flex: 1 1 auto;
 }
 
+.tcg-kiosk__page-jump {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+    color: #1d2327;
+    font-size: 0.9rem;
+}
+
+.tcg-kiosk__page-jump input[type="number"] {
+    width: 4.5rem;
+    padding: 4px 8px;
+}
+
 .tcg-kiosk__grid {
     --tcg-card-columns: 5;
     --tcg-card-rows: 2;
@@ -3172,6 +3186,49 @@ CSS;
     const statusTemplate = i18n.pageStatus || 'Page %1$s of %2$s';
     status.textContent = statusTemplate.replace( '%1$s', currentPage ).replace( '%2$s', totalPages );
 
+    const pageJumpLabel = document.createElement( 'label' );
+    pageJumpLabel.className = 'tcg-kiosk__page-jump';
+    pageJumpLabel.setAttribute( 'aria-label', i18n.pageLabel || 'Go to page' );
+
+    const pageJumpPrefix = document.createElement( 'span' );
+    pageJumpPrefix.textContent = ( i18n.pagePrefix || 'Page' ) + ':';
+    pageJumpLabel.appendChild( pageJumpPrefix );
+
+    const pageJumpInput = document.createElement( 'input' );
+    pageJumpInput.type = 'number';
+    pageJumpInput.min = '1';
+    pageJumpInput.max = String( totalPages );
+    pageJumpInput.value = String( currentPage );
+    pageJumpInput.inputMode = 'numeric';
+    pageJumpInput.pattern = '[0-9]*';
+
+    const handlePageJump = () => {
+      const desired = parseInt( pageJumpInput.value, 10 );
+
+      if ( Number.isInteger( desired ) && desired >= 1 && desired <= totalPages ) {
+        if ( desired !== currentPage ) {
+          currentPage = desired;
+          renderCards();
+          return;
+        }
+      }
+
+      pageJumpInput.value = String( currentPage );
+    };
+
+    pageJumpInput.addEventListener( 'change', handlePageJump );
+    pageJumpInput.addEventListener( 'keydown', ( event ) => {
+      if ( event.key === 'Enter' ) {
+        handlePageJump();
+      }
+    } );
+
+    pageJumpLabel.appendChild( pageJumpInput );
+
+    const pageJumpSuffix = document.createElement( 'span' );
+    pageJumpSuffix.textContent = ( i18n.pageSeparator || 'of' ) + ` ${ totalPages }`;
+    pageJumpLabel.appendChild( pageJumpSuffix );
+
     const nextButton = document.createElement( 'button' );
     nextButton.type = 'button';
     nextButton.className = 'tcg-kiosk__page-button';
@@ -3186,6 +3243,7 @@ CSS;
 
     paginationContainer.appendChild( prevButton );
     paginationContainer.appendChild( status );
+    paginationContainer.appendChild( pageJumpLabel );
     paginationContainer.appendChild( nextButton );
   }
 
