@@ -876,7 +876,7 @@ header {
 
 .tcg-kiosk__card-price {
     position: absolute;
-    top: 0.5rem;
+    top: 50%;
     right: 0.5rem;
     background-color: rgba(29, 35, 39, 0.88);
     color: #fff;
@@ -888,6 +888,7 @@ header {
     letter-spacing: 0.02em;
     pointer-events: none;
     z-index: 2;
+    transform: translateY(-50%);
 }
 
 .tcg-kiosk__empty {
@@ -2965,15 +2966,17 @@ CSS;
     const cardRect = card.getBoundingClientRect();
     const imageRect = image.getBoundingClientRect();
 
-    if ( ! cardRect.width || ! imageRect.width ) {
+    if ( ! cardRect.width || ! imageRect.width || ! imageRect.height ) {
       return;
     }
 
     const horizontalGap = Math.max( 0, ( cardRect.width - imageRect.width ) / 2 );
     const verticalGap = Math.max( 0, ( cardRect.height - imageRect.height ) / 2 );
+    const verticalCenter = verticalGap + ( imageRect.height / 2 );
 
     badge.style.right = `${ horizontalGap + 8 }px`;
-    badge.style.top = `${ verticalGap + 8 }px`;
+    badge.style.top = `${ verticalCenter }px`;
+    badge.style.transform = 'translateY(-50%)';
   }
 
   function updateCardPriceBadgePositions() {
