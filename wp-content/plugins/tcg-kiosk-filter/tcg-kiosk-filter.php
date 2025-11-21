@@ -962,14 +962,14 @@ header {
 
 @media (max-width: 900px) {
     .tcg-kiosk {
-        height: auto;
-        max-height: none;
+        height: auto !important;
+        max-height: none !important;
         grid-template-rows: auto auto auto;
-        overflow: visible;
+        overflow: visible !important;
     }
 
     .tcg-kiosk__grid {
-        overflow: visible;
+        overflow: visible !important;
     }
 }
 
