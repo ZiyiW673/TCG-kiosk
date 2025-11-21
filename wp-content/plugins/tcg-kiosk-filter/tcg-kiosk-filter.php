@@ -810,6 +810,15 @@ header {
     overflow: hidden;
 }
 
+.tcg-kiosk[data-page-size="4"] {
+    --tcg-gap: 1.15rem;
+}
+
+.tcg-kiosk[data-page-size="4"] .tcg-kiosk__grid {
+    --tcg-card-columns: 2;
+    --tcg-card-rows: 2;
+}
+
 .tcg-kiosk[data-page-size="10"] .tcg-kiosk__grid {
     --tcg-card-columns: 5;
     --tcg-card-rows: 2;
@@ -952,6 +961,19 @@ header {
 }
 
 @media (max-width: 900px) {
+    .tcg-kiosk {
+        height: auto;
+        max-height: none;
+        grid-template-rows: auto auto auto;
+        overflow: visible;
+    }
+
+    .tcg-kiosk__grid {
+        overflow: visible;
+    }
+}
+
+@media (max-width: 900px) {
     .tcg-kiosk__card-overlay-panel {
         flex-direction: column;
         max-height: min(92vh, 92dvh);
@@ -1071,8 +1093,12 @@ CSS;
     i18n.typeLabel ||
     'Type';
   let currentTypeLabel = DEFAULT_TYPE_LABEL;
+  const ALLOWED_PAGE_SIZES = [ 4, 10, 12, 16, 20 ];
+  const MOBILE_PAGE_SIZE = 4;
+  const mobilePageQuery = window.matchMedia( '(max-width: 900px)' );
   const DEFAULT_PAGE_SIZE = parseInt( pageSizeSelect.value, 10 ) || 10;
   let cardsPerPage = DEFAULT_PAGE_SIZE;
+  let desktopPageSize = DEFAULT_PAGE_SIZE;
   let hasInteracted = false;
   let currentPage = 1;
   let selectedTypeValue = '';
@@ -1080,11 +1106,34 @@ CSS;
   let pendingPriceBadgeAnimationFrame = null;
 
   function applyPageSizeLayout() {
-    const normalized = [ 10, 12, 16, 20 ].includes( cardsPerPage ) ? cardsPerPage : 10;
-    cardsPerPage = normalized;
-    kioskRoot.dataset.pageSize = String( normalized );
-    if ( pageSizeSelect.value !== String( normalized ) ) {
-      pageSizeSelect.value = String( normalized );
+    const normalizedPageSize = ALLOWED_PAGE_SIZES.includes( cardsPerPage )
+      ? cardsPerPage
+      : DEFAULT_PAGE_SIZE;
+
+    if ( mobilePageQuery.matches ) {
+      cardsPerPage = MOBILE_PAGE_SIZE;
+    } else {
+      desktopPageSize = normalizedPageSize;
+      cardsPerPage = normalizedPageSize;
+    }
+
+    const appliedPageSize = mobilePageQuery.matches ? MOBILE_PAGE_SIZE : cardsPerPage;
+
+    kioskRoot.dataset.pageSize = String( appliedPageSize );
+
+    if ( pageSizeSelect.value !== String( appliedPageSize ) ) {
+      pageSizeSelect.value = String( appliedPageSize );
+    }
+  }
+
+  function handleMobilePageSizeChange() {
+    const previousPageSize = cardsPerPage;
+
+    applyPageSizeLayout();
+
+    if ( previousPageSize !== cardsPerPage ) {
+      currentPage = 1;
+      renderCards();
     }
   }
 
@@ -3316,13 +3365,24 @@ CSS;
     const requested = parseInt( pageSizeSelect.value, 10 );
 
     if ( Number.isInteger( requested ) ) {
-      cardsPerPage = requested;
+      if ( mobilePageQuery.matches ) {
+        desktopPageSize = requested;
+      } else {
+        cardsPerPage = requested;
+        desktopPageSize = requested;
+      }
       applyPageSizeLayout();
       hasInteracted = true;
       currentPage = 1;
       renderCards();
     }
   } );
+
+  if ( mobilePageQuery && typeof mobilePageQuery.addEventListener === 'function' ) {
+    mobilePageQuery.addEventListener( 'change', handleMobilePageSizeChange );
+  } else if ( mobilePageQuery && typeof mobilePageQuery.addListener === 'function' ) {
+    mobilePageQuery.addListener( handleMobilePageSizeChange );
+  }
 
   const placeholders = i18n;
   if ( setSelect.dataset ) {
@@ -3415,6 +3475,7 @@ JS;
                         <label class="tcg-kiosk__page-size" for="tcg-kiosk-page-size">
                             <span><?php esc_html_e( 'Cards per page', 'tcg-kiosk-filter' ); ?></span>
                             <select id="tcg-kiosk-page-size" class="tcg-kiosk__select">
+                                <option value="4">4</option>
                                 <option value="10" selected>10</option>
                                 <option value="12">12</option>
                                 <option value="16">16</option>
