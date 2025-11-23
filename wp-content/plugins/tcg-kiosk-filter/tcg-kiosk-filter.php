@@ -3061,14 +3061,9 @@ CSS;
     }
 
     const cards = getFilteredCards();
-    const isMobileScrolling = mobilePageQuery.matches;
-    const totalPages = isMobileScrolling
-      ? 1
-      : Math.ceil( cards.length / cardsPerPage );
+    const totalPages = Math.ceil( cards.length / cardsPerPage );
 
-    if ( isMobileScrolling ) {
-      currentPage = 1;
-    } else if ( totalPages === 0 ) {
+    if ( totalPages === 0 ) {
       currentPage = 1;
     } else if ( currentPage > totalPages ) {
       currentPage = totalPages;
@@ -3087,10 +3082,8 @@ CSS;
 
     const fragment = document.createDocumentFragment();
 
-    const startIndex = isMobileScrolling ? 0 : ( currentPage - 1 ) * cardsPerPage;
-    const pageCards = isMobileScrolling
-      ? cards
-      : cards.slice( startIndex, startIndex + cardsPerPage );
+    const startIndex = ( currentPage - 1 ) * cardsPerPage;
+    const pageCards = cards.slice( startIndex, startIndex + cardsPerPage );
 
     pageCards.forEach( ( card, index ) => {
       const item = document.createElement( 'article' );
@@ -3152,7 +3145,7 @@ CSS;
 
     resultsContainer.appendChild( fragment );
     scheduleCardPriceBadgeUpdate();
-    renderPagination( isMobileScrolling ? 0 : totalPages );
+    renderPagination( totalPages );
   }
 
   function handleImageError( img, card ) {
