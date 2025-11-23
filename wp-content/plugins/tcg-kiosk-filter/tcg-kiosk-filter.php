@@ -1426,6 +1426,32 @@ CSS;
     return purchasable && ( inStock || backordersAllowed );
   }
 
+  function isEntryInStockForDisplay( entry ) {
+    if ( ! isEntryPurchasable( entry ) ) {
+      return false;
+    }
+
+    const stockValue = getEntryAvailableStock( entry );
+
+    if ( 'number' === typeof stockValue ) {
+      if ( stockValue > 0 ) {
+        return true;
+      }
+
+      return !! entry.backordersAllowed;
+    }
+
+    if ( 'boolean' === typeof entry.isInStock ) {
+      if ( entry.isInStock ) {
+        return true;
+      }
+
+      return !! entry.backordersAllowed;
+    }
+
+    return true;
+  }
+
   function pruneVariationParentEntries( entries ) {
     if ( ! Array.isArray( entries ) || entries.length < 2 ) {
       return Array.isArray( entries ) ? entries : [];
@@ -2486,6 +2512,26 @@ CSS;
     if ( searchTerm ) {
       cards = cards.filter( ( card ) => card.name.toLowerCase().includes( searchTerm ) );
     }
+
+    cards = cards.filter( ( card ) => {
+      if ( ! card || 'object' !== typeof card ) {
+        return false;
+      }
+
+      if ( ! Array.isArray( card.products ) || ! card.products.length ) {
+        return true;
+      }
+
+      const entries = pruneVariationParentEntries( card.products )
+        .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
+        .filter( Boolean );
+
+      if ( ! entries.length ) {
+        return true;
+      }
+
+      return entries.some( ( entry ) => isEntryInStockForDisplay( entry ) );
+    } );
 
     return cards;
   }
