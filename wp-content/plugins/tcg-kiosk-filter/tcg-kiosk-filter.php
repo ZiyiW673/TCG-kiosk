@@ -1163,6 +1163,7 @@ CSS;
 
     let scrollPosition = window.scrollY + window.innerHeight;
     let threshold = document.documentElement.scrollHeight - 200;
+    const targetPage = Math.min( totalPages, currentPage + 2 );
 
     if ( scrollPosition < threshold || isMobileAppendingPage ) {
       return;
@@ -1172,7 +1173,11 @@ CSS;
 
     let safetyCounter = 0;
 
-    while ( scrollPosition >= threshold && currentPage < totalPages && safetyCounter < 5 ) {
+    while (
+      scrollPosition >= threshold &&
+      currentPage < targetPage &&
+      safetyCounter < 5
+    ) {
       currentPage += 1;
       renderCards( true );
       safetyCounter += 1;
@@ -1213,8 +1218,9 @@ CSS;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     let documentHeight = document.documentElement.scrollHeight || 0;
     const heightBuffer = 320;
+    const targetPage = Math.min( totalPages, currentPage + 2 );
 
-    if ( documentHeight > viewportHeight + heightBuffer ) {
+    if ( documentHeight > viewportHeight + heightBuffer && currentPage >= targetPage ) {
       return;
     }
 
@@ -1223,7 +1229,7 @@ CSS;
     let safetyCounter = 0;
 
     while (
-      documentHeight <= viewportHeight + heightBuffer &&
+      ( documentHeight <= viewportHeight + heightBuffer || currentPage < targetPage ) &&
       currentPage < totalPages &&
       safetyCounter < 8
     ) {
