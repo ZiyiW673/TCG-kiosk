@@ -805,6 +805,7 @@ header {
     gap: var(--tcg-gap);
     grid-template-columns: repeat(var(--tcg-card-columns), minmax(0, 1fr));
     grid-template-rows: repeat(var(--tcg-card-rows), minmax(0, 1fr));
+    grid-auto-rows: minmax(0, 1fr);
     align-items: stretch;
     justify-items: stretch;
     overflow: hidden;
@@ -863,7 +864,8 @@ header {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    height: 100%;
+    aspect-ratio: 63 / 88;
+    height: auto;
     min-height: 0;
     cursor: pointer;
     position: relative;
