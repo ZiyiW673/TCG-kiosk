@@ -1147,6 +1147,7 @@ CSS;
   let filteredCardsCache = [];
   let mobileScrollListenerAttached = false;
   let isMobileAppendingPage = false;
+  let autoAppendGuardDepth = 0;
 
   function handleMobileScroll() {
     if ( ! mobilePageQuery.matches ) {
@@ -1188,6 +1189,35 @@ CSS;
 
     window.removeEventListener( 'scroll', handleMobileScroll );
     mobileScrollListenerAttached = false;
+  }
+
+  function maybeAutoAppendForShortScreens( totalPages ) {
+    if ( ! mobilePageQuery.matches ) {
+      return;
+    }
+
+    if ( isMobileAppendingPage || currentPage >= totalPages || totalPages <= 1 ) {
+      return;
+    }
+
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const documentHeight = document.documentElement.scrollHeight;
+
+    if ( documentHeight > viewportHeight + 120 ) {
+      return;
+    }
+
+    // Prevent runaway recursion if pages remain too short.
+    if ( autoAppendGuardDepth > 5 ) {
+      return;
+    }
+
+    isMobileAppendingPage = true;
+    autoAppendGuardDepth += 1;
+    currentPage += 1;
+    renderCards( true );
+    autoAppendGuardDepth -= 1;
+    isMobileAppendingPage = false;
   }
 
   function applyPageSizeLayout() {
@@ -3307,6 +3337,8 @@ CSS;
     } else {
       detachMobileScrollListener();
     }
+
+    maybeAutoAppendForShortScreens( totalPages );
   }
 
   function handleImageError( img, card ) {
