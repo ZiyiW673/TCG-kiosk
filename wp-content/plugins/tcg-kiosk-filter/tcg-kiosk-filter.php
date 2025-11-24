@@ -1135,6 +1135,7 @@ CSS;
   let currentTypeLabel = DEFAULT_TYPE_LABEL;
   const ALLOWED_PAGE_SIZES = [ 4, 10, 12, 16, 20 ];
   const MOBILE_PAGE_SIZE = 4;
+  const MOBILE_CARD_BUFFER = 16;
   const mobilePageQuery = window.matchMedia( '(max-width: 900px)' );
   const DEFAULT_PAGE_SIZE = parseInt( pageSizeSelect.value, 10 ) || 10;
   let cardsPerPage = DEFAULT_PAGE_SIZE;
@@ -1147,6 +1148,14 @@ CSS;
   let filteredCardsCache = [];
   let mobileScrollListenerAttached = false;
   let isMobileAppendingPage = false;
+
+  function getMobileBufferPageCount() {
+    if ( cardsPerPage <= 0 ) {
+      return 2;
+    }
+
+    return Math.max( 2, Math.ceil( MOBILE_CARD_BUFFER / cardsPerPage ) );
+  }
 
   function handleMobileScroll() {
     if ( ! mobilePageQuery.matches ) {
@@ -1163,7 +1172,8 @@ CSS;
 
     let scrollPosition = window.scrollY + window.innerHeight;
     let threshold = document.documentElement.scrollHeight - 200;
-    const targetPage = Math.min( totalPages, currentPage + 2 );
+    const bufferPages = getMobileBufferPageCount();
+    const targetPage = Math.min( totalPages, currentPage + bufferPages );
 
     if ( scrollPosition < threshold || isMobileAppendingPage ) {
       return;
@@ -1212,7 +1222,8 @@ CSS;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
     let documentHeight = document.documentElement.scrollHeight || 0;
     const heightBuffer = 320;
-    const targetPage = Math.min( totalPages, currentPage + 2 );
+    const bufferPages = getMobileBufferPageCount();
+    const targetPage = Math.min( totalPages, currentPage + bufferPages );
 
     if ( documentHeight > viewportHeight + heightBuffer && currentPage >= targetPage ) {
       return;
