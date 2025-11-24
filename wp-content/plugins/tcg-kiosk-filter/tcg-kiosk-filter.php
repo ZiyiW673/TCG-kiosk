@@ -1173,16 +1173,10 @@ CSS;
 
     let safetyCounter = 0;
 
-    while (
-      scrollPosition >= threshold &&
-      currentPage < targetPage &&
-      safetyCounter < 5
-    ) {
+    while ( currentPage < targetPage && safetyCounter < 5 ) {
       currentPage += 1;
       renderCards( true );
       safetyCounter += 1;
-      scrollPosition = window.scrollY + window.innerHeight;
-      threshold = document.documentElement.scrollHeight - 200;
     }
 
     isMobileAppendingPage = false;
