@@ -1104,6 +1104,51 @@ CSS;
   let selectedTypeValue = '';
   let lastFocusedCard = null;
   let pendingPriceBadgeAnimationFrame = null;
+  let filteredCardsCache = [];
+  let mobileScrollListenerAttached = false;
+  let isMobileAppendingPage = false;
+
+  function handleMobileScroll() {
+    if ( ! mobilePageQuery.matches ) {
+      detachMobileScrollListener();
+      return;
+    }
+
+    const totalPages = Math.ceil( filteredCardsCache.length / cardsPerPage );
+
+    if ( currentPage >= totalPages || totalPages <= 1 ) {
+      detachMobileScrollListener();
+      return;
+    }
+
+    const scrollPosition = window.scrollY + window.innerHeight;
+    const threshold = document.documentElement.scrollHeight - 200;
+
+    if ( scrollPosition >= threshold && ! isMobileAppendingPage ) {
+      isMobileAppendingPage = true;
+      currentPage += 1;
+      renderCards( true );
+      isMobileAppendingPage = false;
+    }
+  }
+
+  function attachMobileScrollListener() {
+    if ( mobileScrollListenerAttached ) {
+      return;
+    }
+
+    window.addEventListener( 'scroll', handleMobileScroll, { passive: true } );
+    mobileScrollListenerAttached = true;
+  }
+
+  function detachMobileScrollListener() {
+    if ( ! mobileScrollListenerAttached ) {
+      return;
+    }
+
+    window.removeEventListener( 'scroll', handleMobileScroll );
+    mobileScrollListenerAttached = false;
+  }
 
   function applyPageSizeLayout() {
     const normalizedPageSize = ALLOWED_PAGE_SIZES.includes( cardsPerPage )
@@ -3095,18 +3140,22 @@ CSS;
     } );
   }
 
-  function renderCards() {
+  function renderCards( appendMobile = false ) {
     applyPageSizeLayout();
 
-    closeCardOverlay( { restoreFocus: false } );
+    if ( ! appendMobile ) {
+      closeCardOverlay( { restoreFocus: false } );
+    }
 
     if ( ! hasInteracted ) {
       resultsContainer.innerHTML = '';
+      detachMobileScrollListener();
       renderPagination( 0 );
       return;
     }
 
     const cards = getFilteredCards();
+    filteredCardsCache = cards.slice();
     const totalPages = Math.ceil( cards.length / cardsPerPage );
 
     if ( totalPages === 0 ) {
@@ -3115,13 +3164,16 @@ CSS;
       currentPage = totalPages;
     }
 
-    resultsContainer.innerHTML = '';
+    if ( ! appendMobile ) {
+      resultsContainer.innerHTML = '';
+    }
 
     if ( ! cards.length ) {
       const emptyState = document.createElement( 'p' );
       emptyState.className = 'tcg-kiosk__empty';
       emptyState.textContent = i18n.noCards || 'No cards match your filters.';
       resultsContainer.appendChild( emptyState );
+      detachMobileScrollListener();
       renderPagination( 0 );
       return;
     }
@@ -3192,6 +3244,16 @@ CSS;
     resultsContainer.appendChild( fragment );
     scheduleCardPriceBadgeUpdate();
     renderPagination( totalPages );
+
+    if ( mobilePageQuery.matches ) {
+      if ( totalPages > currentPage ) {
+        attachMobileScrollListener();
+      } else {
+        detachMobileScrollListener();
+      }
+    } else {
+      detachMobileScrollListener();
+    }
   }
 
   function handleImageError( img, card ) {
