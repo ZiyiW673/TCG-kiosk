@@ -958,6 +958,12 @@ header {
         width: 100%;
         justify-content: flex-start;
     }
+
+    .tcg-kiosk__page-size,
+    .tcg-kiosk__page-status,
+    .tcg-kiosk__page-jump {
+        display: none;
+    }
 }
 
 @media (max-width: 900px) {
