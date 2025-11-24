@@ -1162,15 +1162,26 @@ CSS;
       return;
     }
 
-    const scrollPosition = window.scrollY + window.innerHeight;
-    const threshold = document.documentElement.scrollHeight - 200;
+    let scrollPosition = window.scrollY + window.innerHeight;
+    let threshold = document.documentElement.scrollHeight - 200;
 
-    if ( scrollPosition >= threshold && ! isMobileAppendingPage ) {
-      isMobileAppendingPage = true;
+    if ( scrollPosition < threshold || isMobileAppendingPage ) {
+      return;
+    }
+
+    isMobileAppendingPage = true;
+
+    let safetyCounter = 0;
+
+    while ( scrollPosition >= threshold && currentPage < totalPages && safetyCounter < 5 ) {
       currentPage += 1;
       renderCards( true );
-      isMobileAppendingPage = false;
+      safetyCounter += 1;
+      scrollPosition = window.scrollY + window.innerHeight;
+      threshold = document.documentElement.scrollHeight - 200;
     }
+
+    isMobileAppendingPage = false;
   }
 
   function attachMobileScrollListener() {
