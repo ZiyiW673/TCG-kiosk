@@ -871,6 +871,22 @@ header {
     position: relative;
 }
 
+.tcg-kiosk__card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #f0f2f5 25%, #e6e8eb 37%, #f0f2f5 63%);
+    background-size: 400% 100%;
+    animation: tcg-kiosk-skeleton 1.2s ease-in-out infinite;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.tcg-kiosk__card--loading::after {
+    opacity: 1;
+}
+
 .tcg-kiosk__card img {
     width: 100%;
     height: 100%;
@@ -878,6 +894,12 @@ header {
     flex: 1 1 auto;
     border-radius: 0;
     object-fit: contain;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+.tcg-kiosk__card--loading img {
+    opacity: 0;
 }
 
 .tcg-kiosk__card:focus-visible {
@@ -900,6 +922,15 @@ header {
     pointer-events: none;
     z-index: 2;
     transform: translateY(-50%);
+}
+
+@keyframes tcg-kiosk-skeleton {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
 }
 
 .tcg-kiosk__empty {
@@ -3195,6 +3226,7 @@ CSS;
     pageCards.forEach( ( card, index ) => {
       const item = document.createElement( 'article' );
       item.className = 'tcg-kiosk__card';
+      item.classList.add( 'tcg-kiosk__card--loading' );
 
       attachCardOverlayHandlers( item, card );
 
@@ -3230,7 +3262,19 @@ CSS;
       if ( 0 === startIndex && index < 2 ) {
         img.fetchPriority = 'high';
       }
-      img.addEventListener( 'error', () => handleImageError( img, card ) );
+      const handleImageResolved = () => {
+        item.classList.remove( 'tcg-kiosk__card--loading' );
+      };
+
+      if ( img.complete && img.naturalWidth > 0 ) {
+        handleImageResolved();
+      }
+
+      img.addEventListener( 'load', handleImageResolved );
+      img.addEventListener( 'error', () => {
+        handleImageError( img, card );
+        handleImageResolved();
+      } );
       item.appendChild( img );
 
       const priceBadge = createCardPriceBadge( card );
