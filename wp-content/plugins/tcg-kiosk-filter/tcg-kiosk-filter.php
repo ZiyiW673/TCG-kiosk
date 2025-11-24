@@ -963,7 +963,8 @@ header {
 
     .tcg-kiosk__page-size,
     .tcg-kiosk__page-status,
-    .tcg-kiosk__page-jump {
+    .tcg-kiosk__page-jump,
+    .tcg-kiosk__page-button {
         display: none;
     }
 }
