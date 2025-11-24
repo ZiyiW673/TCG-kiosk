@@ -1147,7 +1147,6 @@ CSS;
   let filteredCardsCache = [];
   let mobileScrollListenerAttached = false;
   let isMobileAppendingPage = false;
-  let autoAppendGuardDepth = 0;
 
   function handleMobileScroll() {
     if ( ! mobilePageQuery.matches ) {
@@ -1211,23 +1210,29 @@ CSS;
       return;
     }
 
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-    const documentHeight = document.documentElement.scrollHeight;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    let documentHeight = document.documentElement.scrollHeight || 0;
+    const heightBuffer = 320;
 
-    if ( documentHeight > viewportHeight + 120 ) {
-      return;
-    }
-
-    // Prevent runaway recursion if pages remain too short.
-    if ( autoAppendGuardDepth > 5 ) {
+    if ( documentHeight > viewportHeight + heightBuffer ) {
       return;
     }
 
     isMobileAppendingPage = true;
-    autoAppendGuardDepth += 1;
-    currentPage += 1;
-    renderCards( true );
-    autoAppendGuardDepth -= 1;
+
+    let safetyCounter = 0;
+
+    while (
+      documentHeight <= viewportHeight + heightBuffer &&
+      currentPage < totalPages &&
+      safetyCounter < 8
+    ) {
+      currentPage += 1;
+      renderCards( true );
+      safetyCounter += 1;
+      documentHeight = document.documentElement.scrollHeight || 0;
+    }
+
     isMobileAppendingPage = false;
   }
 
