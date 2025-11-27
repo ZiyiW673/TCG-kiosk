@@ -1580,6 +1580,7 @@ CSS;
     const purchasableFlag = resolveBooleanFlag( entry, [ 'isPurchasable', 'is_purchasable', 'purchasable' ] );
     const inStockFlag = resolveBooleanFlag( entry, [ 'isInStock', 'is_in_stock', 'in_stock' ] );
     const backordersAllowedFlag = resolveBooleanFlag( entry, [ 'backordersAllowed', 'backorders_allowed' ] );
+    const manageStockFlag = resolveBooleanFlag( entry, [ 'manage_stock', 'manageStock', 'managing_stock' ] );
     const stockQuantity = getEntryAvailableStock( entry );
 
     let backordersAllowed = backordersAllowedFlag;
@@ -1588,10 +1589,20 @@ CSS;
       backordersAllowed = entry.backorders.toLowerCase() !== 'no';
     }
 
+    const stockStatus = ( entry.stock_status || entry.stockStatus || '' ).toString().toLowerCase();
     const hasKnownStock = Number.isInteger( stockQuantity );
     const purchasable = null === purchasableFlag ? true : !! purchasableFlag;
-    const inStock = hasKnownStock ? stockQuantity > 0 : inStockFlag;
     const backordersOk = !! backordersAllowed;
+
+    let inStock = null;
+
+    if ( hasKnownStock && false !== manageStockFlag ) {
+      inStock = stockQuantity > 0;
+    } else if ( null !== inStockFlag ) {
+      inStock = !! inStockFlag;
+    } else if ( stockStatus ) {
+      inStock = 'instock' === stockStatus;
+    }
 
     if ( false === purchasableFlag ) {
       return false;
@@ -1599,10 +1610,6 @@ CSS;
 
     if ( false === inStock ) {
       return backordersOk;
-    }
-
-    if ( true === inStock ) {
-      return purchasable || backordersOk;
     }
 
     return purchasable || backordersOk;
@@ -2147,6 +2154,8 @@ CSS;
         entry.available_variations,
         entry.childVariations,
         entry.child_variations,
+        entry.productVariations,
+        entry.product_variations,
         entry.children,
         entry.variation_options,
       ];
