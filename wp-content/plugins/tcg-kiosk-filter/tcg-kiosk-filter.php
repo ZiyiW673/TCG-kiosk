@@ -1594,6 +1594,26 @@ CSS;
     return true;
   }
 
+  function cardHasInStockProducts( card ) {
+    if ( ! card || 'object' !== typeof card ) {
+      return false;
+    }
+
+    if ( ! Array.isArray( card.products ) || ! card.products.length ) {
+      return false;
+    }
+
+    const entries = pruneVariationParentEntries( card.products )
+      .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
+      .filter( Boolean );
+
+    if ( ! entries.length ) {
+      return false;
+    }
+
+    return entries.some( ( entry ) => isEntryInStockForDisplay( entry ) );
+  }
+
   function pruneVariationParentEntries( entries ) {
     if ( ! Array.isArray( entries ) || entries.length < 2 ) {
       return Array.isArray( entries ) ? entries : [];
@@ -2698,9 +2718,15 @@ CSS;
     }
 
     selected.cards.forEach( ( card ) => {
-      if ( card.set ) {
-        sets.add( card.set );
+      if ( ! card || ! card.set ) {
+        return;
       }
+
+      if ( ! cardHasInStockProducts( card ) ) {
+        return;
+      }
+
+      sets.add( card.set );
     } );
 
     const availableSets = Array.from( sets );
