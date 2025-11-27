@@ -1572,9 +1572,9 @@ CSS;
     return null;
   }
 
-  function isEntryPurchasable( entry ) {
+  function getEntryStockState( entry ) {
     if ( ! entry || 'object' !== typeof entry ) {
-      return false;
+      return { purchasableFlag: null, inStock: null, backordersOk: false };
     }
 
     const purchasableFlag = resolveBooleanFlag( entry, [ 'isPurchasable', 'is_purchasable', 'purchasable' ] );
@@ -1591,51 +1591,69 @@ CSS;
 
     const stockStatus = ( entry.stock_status || entry.stockStatus || '' ).toString().toLowerCase();
     const hasKnownStock = Number.isInteger( stockQuantity );
-    const purchasable = null === purchasableFlag ? true : !! purchasableFlag;
-    const backordersOk = !! backordersAllowed;
+    const manageStock = true === manageStockFlag ? true : false === manageStockFlag ? false : null;
 
     let inStock = null;
 
-    if ( hasKnownStock && false !== manageStockFlag ) {
-      inStock = stockQuantity > 0;
-    } else if ( null !== inStockFlag ) {
-      inStock = !! inStockFlag;
-    } else if ( stockStatus ) {
-      inStock = 'instock' === stockStatus;
+    if ( true === manageStock ) {
+      if ( hasKnownStock ) {
+        inStock = stockQuantity > 0;
+      } else if ( stockStatus ) {
+        inStock = 'instock' === stockStatus;
+      }
     }
+
+    if ( null === inStock && false === manageStock ) {
+      if ( stockStatus ) {
+        inStock = 'instock' === stockStatus;
+      } else if ( hasKnownStock ) {
+        inStock = stockQuantity > 0;
+      }
+    }
+
+    if ( null === inStock ) {
+      if ( stockStatus ) {
+        inStock = 'instock' === stockStatus;
+      } else if ( hasKnownStock ) {
+        inStock = stockQuantity > 0;
+      }
+    }
+
+    return {
+      purchasableFlag,
+      inStock,
+      backordersOk: !! backordersAllowed,
+    };
+  }
+
+  function isEntryPurchasable( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return false;
+    }
+
+    const { purchasableFlag, inStock, backordersOk } = getEntryStockState( entry );
+    const purchasable = null === purchasableFlag ? true : !! purchasableFlag;
 
     if ( false === purchasableFlag ) {
       return false;
     }
 
     if ( false === inStock ) {
-      return backordersOk;
+      return purchasable && backordersOk;
     }
 
     return purchasable || backordersOk;
   }
 
   function isEntryInStockForDisplay( entry ) {
-    if ( ! isEntryPurchasable( entry ) ) {
+    const { purchasableFlag, inStock, backordersOk } = getEntryStockState( entry );
+
+    if ( false === purchasableFlag ) {
       return false;
     }
 
-    const stockValue = getEntryAvailableStock( entry );
-
-    if ( 'number' === typeof stockValue ) {
-      if ( stockValue > 0 ) {
-        return true;
-      }
-
-      return !! entry.backordersAllowed;
-    }
-
-    if ( 'boolean' === typeof entry.isInStock ) {
-      if ( entry.isInStock ) {
-        return true;
-      }
-
-      return !! entry.backordersAllowed;
+    if ( false === inStock ) {
+      return !! backordersOk;
     }
 
     return true;
