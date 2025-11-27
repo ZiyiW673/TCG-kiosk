@@ -1643,9 +1643,7 @@ CSS;
       return false;
     }
 
-    const entries = pruneVariationParentEntries( card.products )
-      .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
-      .filter( Boolean );
+    const entries = normalizeProductEntries( card.products );
 
     if ( ! entries.length ) {
       return false;
@@ -1711,6 +1709,12 @@ CSS;
     } );
 
     return filtered.length ? filtered : entries;
+  }
+
+  function normalizeProductEntries( entries ) {
+    const expanded = expandEntriesWithNestedVariations( entries );
+
+    return pruneVariationParentEntries( expanded );
   }
 
   function showCommerceMessage( message, status ) {
@@ -2050,6 +2054,20 @@ CSS;
     return Number.isInteger( parsed ) && parsed > 0 ? parsed : 0;
   }
 
+  function getEntryId( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return 0;
+    }
+
+    return (
+      toPositiveInt( entry.id ) ||
+      toPositiveInt( entry.ID ) ||
+      toPositiveInt( entry.productId ) ||
+      toPositiveInt( entry.product_id ) ||
+      0
+    );
+  }
+
   function getEntryParentId( entry ) {
     if ( ! entry || 'object' !== typeof entry ) {
       return 0;
@@ -2075,6 +2093,82 @@ CSS;
     }
 
     return 0;
+  }
+
+  function expandEntriesWithNestedVariations( entries ) {
+    if ( ! Array.isArray( entries ) || ! entries.length ) {
+      return Array.isArray( entries ) ? entries : [];
+    }
+
+    const normalized = entries
+      .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
+      .filter( Boolean );
+    const result = [];
+    const seen = new Set();
+
+    const addEntry = ( entry, parentIdHint ) => {
+      if ( ! entry || 'object' !== typeof entry ) {
+        return;
+      }
+
+      const variationId = getEntryVariationId( entry );
+      const entryId = getEntryId( entry );
+      const dedupeKey = variationId || entryId;
+
+      if ( dedupeKey && seen.has( dedupeKey ) ) {
+        return;
+      }
+
+      if ( dedupeKey ) {
+        seen.add( dedupeKey );
+      }
+
+      const parentId = getEntryParentId( entry ) || parentIdHint || 0;
+
+      if ( parentId && ! getEntryParentId( entry ) ) {
+        entry.parent_id = parentId;
+      }
+
+      if ( ! entry.type && ( variationId || parentId ) ) {
+        entry.type = 'product_variation';
+      }
+
+      result.push( entry );
+    };
+
+    normalized.forEach( ( entry ) => {
+      const parentId = getEntryId( entry );
+
+      addEntry( entry, 0 );
+
+      const variationGroups = [
+        entry.variations,
+        entry.availableVariations,
+        entry.available_variations,
+        entry.childVariations,
+        entry.child_variations,
+        entry.children,
+        entry.variation_options,
+      ];
+
+      variationGroups.forEach( ( group ) => {
+        if ( ! Array.isArray( group ) || ! group.length ) {
+          return;
+        }
+
+        group.forEach( ( child ) => {
+          if ( ! child || 'object' !== typeof child ) {
+            return;
+          }
+
+          const clone = Object.assign( {}, child );
+
+          addEntry( clone, parentId );
+        } );
+      } );
+    } );
+
+    return result;
   }
 
   function isLikelyVariationObject( value ) {
@@ -2279,11 +2373,7 @@ CSS;
       return;
     }
 
-    let entries = card.products
-      .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
-      .filter( Boolean );
-
-    entries = pruneVariationParentEntries( entries );
+    let entries = normalizeProductEntries( card.products );
 
     if ( ! entries.length ) {
       return;
@@ -2756,9 +2846,7 @@ CSS;
         return true;
       }
 
-      const entries = pruneVariationParentEntries( card.products )
-        .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
-        .filter( Boolean );
+      const entries = normalizeProductEntries( card.products );
 
       if ( ! entries.length ) {
         return true;
@@ -3232,7 +3320,7 @@ CSS;
       return '';
     }
 
-    const entries = pruneVariationParentEntries( card.products );
+    const entries = normalizeProductEntries( card.products );
     const prices = [];
     let currencySymbol = '';
 
