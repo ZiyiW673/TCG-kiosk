@@ -1666,18 +1666,18 @@ CSS;
         return;
       }
 
-      const hasVariationId = toPositiveInt( entry.variationId ) || toPositiveInt( entry.variation_id );
-      const isVariationType = entry.type === 'variation';
+      const hasVariationId =
+        toPositiveInt( entry.variationId ) ||
+        toPositiveInt( entry.variation_id ) ||
+        toPositiveInt( entry.variationID );
+      const isVariationType =
+        entry.type === 'variation' || entry.type === 'product_variation';
 
       if ( ! hasVariationId && ! isVariationType ) {
         return;
       }
 
-      const parentId =
-        toPositiveInt( entry.parentId ) ||
-        toPositiveInt( entry.parent_id ) ||
-        toPositiveInt( entry.productId ) ||
-        toPositiveInt( entry.product_id );
+      const parentId = getEntryParentId( entry );
 
       if ( parentId ) {
         parentIdsWithVariations.add( parentId );
@@ -1701,11 +1701,7 @@ CSS;
         return true;
       }
 
-      const candidateParentId =
-        toPositiveInt( entry.productId ) ||
-        toPositiveInt( entry.product_id ) ||
-        toPositiveInt( entry.parentId ) ||
-        toPositiveInt( entry.parent_id );
+      const candidateParentId = getEntryParentId( entry );
 
       if ( candidateParentId && parentIdsWithVariations.has( candidateParentId ) ) {
         return false;
@@ -2054,20 +2050,56 @@ CSS;
     return Number.isInteger( parsed ) && parsed > 0 ? parsed : 0;
   }
 
+  function getEntryParentId( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return 0;
+    }
+
+    const candidates = [
+      entry.parentId,
+      entry.parent_id,
+      entry.parentID,
+      entry.variationParentId,
+      entry.variation_parent_id,
+      entry.variationParentID,
+      entry.productId,
+      entry.product_id,
+    ];
+
+    for ( const candidate of candidates ) {
+      const parsed = toPositiveInt( candidate );
+
+      if ( parsed ) {
+        return parsed;
+      }
+    }
+
+    return 0;
+  }
+
   function isLikelyVariationObject( value ) {
     if ( ! value || 'object' !== typeof value ) {
       return false;
     }
 
-    if ( value.type === 'variation' || value.isVariation || value.is_variation ) {
+    if (
+      value.type === 'variation' ||
+      value.type === 'product_variation' ||
+      value.isVariation ||
+      value.is_variation
+    ) {
       return true;
     }
 
-    if ( toPositiveInt( value.parentId ) || toPositiveInt( value.parent_id ) ) {
+    if ( getEntryParentId( value ) ) {
       return true;
     }
 
-    if ( toPositiveInt( value.variationId ) || toPositiveInt( value.variation_id ) ) {
+    if (
+      toPositiveInt( value.variationId ) ||
+      toPositiveInt( value.variation_id ) ||
+      toPositiveInt( value.variationID )
+    ) {
       return true;
     }
 
