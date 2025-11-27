@@ -2113,6 +2113,18 @@ CSS;
     const result = [];
     const seen = new Set();
 
+    const normalizeGroup = ( group ) => {
+      if ( Array.isArray( group ) ) {
+        return group;
+      }
+
+      if ( group && 'object' === typeof group ) {
+        return Object.values( group );
+      }
+
+      return [];
+    };
+
     const addEntry = ( entry, parentIdHint ) => {
       if ( ! entry || 'object' !== typeof entry ) {
         return;
@@ -2161,11 +2173,13 @@ CSS;
       ];
 
       variationGroups.forEach( ( group ) => {
-        if ( ! Array.isArray( group ) || ! group.length ) {
+        const groupEntries = normalizeGroup( group );
+
+        if ( ! Array.isArray( groupEntries ) || ! groupEntries.length ) {
           return;
         }
 
-        group.forEach( ( child ) => {
+        groupEntries.forEach( ( child ) => {
           if ( ! child || 'object' !== typeof child ) {
             return;
           }
