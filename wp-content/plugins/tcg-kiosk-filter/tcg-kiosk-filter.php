@@ -1556,16 +1556,56 @@ CSS;
     return 'Option ' + String( index + 1 );
   }
 
+  function resolveBooleanFlag( entry, keys ) {
+    if ( ! entry || 'object' !== typeof entry || ! Array.isArray( keys ) ) {
+      return null;
+    }
+
+    for ( let index = 0; index < keys.length; index += 1 ) {
+      const key = keys[ index ];
+
+      if ( Object.prototype.hasOwnProperty.call( entry, key ) ) {
+        return !! entry[ key ];
+      }
+    }
+
+    return null;
+  }
+
   function isEntryPurchasable( entry ) {
     if ( ! entry || 'object' !== typeof entry ) {
       return false;
     }
 
-    const purchasable = !! entry.isPurchasable;
-    const inStock = !! entry.isInStock;
-    const backordersAllowed = !! entry.backordersAllowed;
+    const purchasableFlag = resolveBooleanFlag( entry, [ 'isPurchasable', 'is_purchasable', 'purchasable' ] );
+    const inStockFlag = resolveBooleanFlag( entry, [ 'isInStock', 'is_in_stock', 'in_stock' ] );
+    const backordersAllowedFlag = resolveBooleanFlag( entry, [ 'backordersAllowed', 'backorders_allowed' ] );
+    const stockQuantity = getEntryAvailableStock( entry );
 
-    return purchasable && ( inStock || backordersAllowed );
+    let backordersAllowed = backordersAllowedFlag;
+
+    if ( null === backordersAllowed && 'string' === typeof entry.backorders ) {
+      backordersAllowed = entry.backorders.toLowerCase() !== 'no';
+    }
+
+    const hasKnownStock = Number.isInteger( stockQuantity );
+    const purchasable = null === purchasableFlag ? true : !! purchasableFlag;
+    const inStock = hasKnownStock ? stockQuantity > 0 : inStockFlag;
+    const backordersOk = !! backordersAllowed;
+
+    if ( false === purchasableFlag ) {
+      return false;
+    }
+
+    if ( false === inStock ) {
+      return backordersOk;
+    }
+
+    if ( true === inStock ) {
+      return purchasable || backordersOk;
+    }
+
+    return purchasable || backordersOk;
   }
 
   function isEntryInStockForDisplay( entry ) {
