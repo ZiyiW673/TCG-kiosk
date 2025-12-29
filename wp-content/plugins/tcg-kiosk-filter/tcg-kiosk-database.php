@@ -930,9 +930,9 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          * @return array
          */
         protected function get_game_category_names( $type_slug ) {
-            $normalized = sanitize_title( $type_slug );
+            $game_key = $this->normalize_game_key( $type_slug );
 
-            if ( '' === $normalized ) {
+            if ( '' === $game_key ) {
                 return array();
             }
 
@@ -943,7 +943,32 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'pokemon'   => array( 'Pokemon TCG' ),
             );
 
-            return isset( $map[ $normalized ] ) ? $map[ $normalized ] : array();
+            return isset( $map[ $game_key ] ) ? $map[ $game_key ] : array();
+        }
+
+        /**
+         * Normalize a game key from a type slug.
+         *
+         * @param string $type_slug Game/type slug.
+         *
+         * @return string
+         */
+        protected function normalize_game_key( $type_slug ) {
+            $normalized = sanitize_title( $type_slug );
+
+            if ( '' === $normalized ) {
+                return '';
+            }
+
+            $known = array( 'one-piece', 'gundam', 'riftbound', 'pokemon' );
+
+            foreach ( $known as $key ) {
+                if ( false !== strpos( $normalized, $key ) ) {
+                    return $key;
+                }
+            }
+
+            return $normalized;
         }
 
         /**
@@ -959,7 +984,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 return true;
             }
 
-            $normalized_type = sanitize_title( $type_slug );
+            $normalized_type = $this->normalize_game_key( $type_slug );
 
             if ( '' === $normalized_type ) {
                 return true;
@@ -975,8 +1000,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         return true;
                     }
                 }
-
-                return false;
             }
 
             if ( empty( $entry['productCategories'] ) || ! is_array( $entry['productCategories'] ) ) {
@@ -984,7 +1007,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             }
 
             foreach ( $entry['productCategories'] as $category_slug ) {
-                if ( sanitize_title( $category_slug ) === $normalized_type ) {
+                if ( $this->normalize_game_key( $category_slug ) === $normalized_type ) {
                     return true;
                 }
             }
