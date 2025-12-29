@@ -683,6 +683,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'backordersAllowed'=> $product ? (bool) $product->backorders_allowed() : false,
                 'permalink'        => $this->sanitize_url_value( $product ? $product->get_permalink() : '' ),
                 'productCategories'=> $this->get_product_category_slugs( $product_id, $product ),
+                'productCategoryNames' => $this->get_product_category_names( $product_id, $product ),
                 'attributes'       => array(),
                 'attributeSummary' => '',
             );
@@ -718,6 +719,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'backordersAllowed'=> false,
                 'permalink'        => $this->sanitize_url_value( $permalink ),
                 'productCategories'=> $this->get_product_category_slugs( $product_id ),
+                'productCategoryNames' => $this->get_product_category_names( $product_id ),
                 'attributes'       => array(),
                 'attributeSummary' => '',
             );
@@ -774,6 +776,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $variation ? $variation->get_permalink() : ( $parent_product ? $parent_product->get_permalink() : '' )
                 ),
                 'productCategories'=> $this->get_product_category_slugs( $parent_id, $parent_product ),
+                'productCategoryNames' => $this->get_product_category_names( $parent_id, $parent_product ),
                 'attributes'       => $variation ? $this->prepare_variation_attributes( $variation->get_attributes() ) : array(),
                 'attributeSummary' => $attribute_summary,
             );
@@ -809,6 +812,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'backordersAllowed'=> false,
                 'permalink'        => $this->sanitize_url_value( $parent_product ? $parent_product->get_permalink() : '' ),
                 'productCategories'=> $this->get_product_category_slugs( $parent_id, $parent_product ),
+                'productCategoryNames' => $this->get_product_category_names( $parent_id, $parent_product ),
                 'attributes'       => array(),
                 'attributeSummary' => '',
             );
@@ -823,6 +827,70 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          * @return array
          */
         protected function get_product_category_slugs( $product_id, $product = null ) {
+            $terms = $this->get_product_category_terms( $product_id, $product );
+
+            if ( empty( $terms ) ) {
+                return array();
+            }
+
+            $slugs = array();
+
+            foreach ( $terms as $term ) {
+                if ( ! $term || empty( $term->slug ) ) {
+                    continue;
+                }
+
+                $slug = sanitize_title( $term->slug );
+
+                if ( '' !== $slug ) {
+                    $slugs[] = $slug;
+                }
+            }
+
+            return array_values( array_unique( $slugs ) );
+        }
+
+        /**
+         * Retrieve product category display names for a product.
+         *
+         * @param int        $product_id Product ID.
+         * @param WC_Product $product    Optional product instance.
+         *
+         * @return array
+         */
+        protected function get_product_category_names( $product_id, $product = null ) {
+            $terms = $this->get_product_category_terms( $product_id, $product );
+
+            if ( empty( $terms ) ) {
+                return array();
+            }
+
+            $names = array();
+
+            foreach ( $terms as $term ) {
+                if ( ! $term || empty( $term->name ) ) {
+                    continue;
+                }
+
+                $name = trim( (string) $term->name );
+
+                if ( '' !== $name ) {
+                    $names[] = $name;
+                }
+            }
+
+            return array_values( array_unique( $names ) );
+        }
+
+        /**
+         * Retrieve product category terms for a product.
+         *
+         * @param int        $product_id Product ID.
+         * @param WC_Product $product    Optional product instance.
+         *
+         * @return array
+         */
+        protected function get_product_category_terms( $product_id, $product = null ) {
             $category_ids = array();
 
             if ( $product && method_exists( $product, 'get_category_ids' ) ) {
@@ -851,21 +919,31 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 return array();
             }
 
-            $slugs = array();
+            return $terms;
+        }
 
-            foreach ( $terms as $term ) {
-                if ( ! $term || empty( $term->slug ) ) {
-                    continue;
-                }
+        /**
+         * Retrieve expected category names for a given game slug.
+         *
+         * @param string $type_slug Game/type slug.
+         *
+         * @return array
+         */
+        protected function get_game_category_names( $type_slug ) {
+            $normalized = sanitize_title( $type_slug );
 
-                $slug = sanitize_title( $term->slug );
-
-                if ( '' !== $slug ) {
-                    $slugs[] = $slug;
-                }
+            if ( '' === $normalized ) {
+                return array();
             }
 
-            return array_values( array_unique( $slugs ) );
+            $map = array(
+                'one-piece' => array( 'One Piece TCG' ),
+                'gundam'    => array( 'Gundam TCG' ),
+                'riftbound' => array( 'Riftbound TCG' ),
+                'pokemon'   => array( 'Pokemon TCG' ),
+            );
+
+            return isset( $map[ $normalized ] ) ? $map[ $normalized ] : array();
         }
 
         /**
@@ -885,6 +963,20 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
 
             if ( '' === $normalized_type ) {
                 return true;
+            }
+
+            $expected_names = $this->get_game_category_names( $type_slug );
+
+            if ( ! empty( $expected_names ) && ! empty( $entry['productCategoryNames'] ) && is_array( $entry['productCategoryNames'] ) ) {
+                $expected = array_map( 'sanitize_title', $expected_names );
+
+                foreach ( $entry['productCategoryNames'] as $category_name ) {
+                    if ( in_array( sanitize_title( $category_name ), $expected, true ) ) {
+                        return true;
+                    }
+                }
+
+                return false;
             }
 
             if ( empty( $entry['productCategories'] ) || ! is_array( $entry['productCategories'] ) ) {
