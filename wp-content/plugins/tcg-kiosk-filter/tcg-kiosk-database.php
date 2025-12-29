@@ -264,6 +264,10 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                         continue;
                     }
 
+                    if ( ! $this->entry_matches_game_category( $entry, $type_slug ) ) {
+                        continue;
+                    }
+
                     $product_id   = isset( $entry['productId'] ) ? (int) $entry['productId'] : 0;
                     $variation_id = isset( $entry['variationId'] ) ? (int) $entry['variationId'] : 0;
                     $unique_key   = $product_id . '|' . $variation_id;
@@ -678,6 +682,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'stockQuantity'    => $product && null !== $product->get_stock_quantity() ? (int) $product->get_stock_quantity() : null,
                 'backordersAllowed'=> $product ? (bool) $product->backorders_allowed() : false,
                 'permalink'        => $this->sanitize_url_value( $product ? $product->get_permalink() : '' ),
+                'productCategories'=> $this->get_product_category_slugs( $product_id, $product ),
                 'attributes'       => array(),
                 'attributeSummary' => '',
             );
@@ -712,6 +717,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'stockQuantity'    => null,
                 'backordersAllowed'=> false,
                 'permalink'        => $this->sanitize_url_value( $permalink ),
+                'productCategories'=> $this->get_product_category_slugs( $product_id ),
                 'attributes'       => array(),
                 'attributeSummary' => '',
             );
@@ -767,6 +773,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'permalink'        => $this->sanitize_url_value(
                     $variation ? $variation->get_permalink() : ( $parent_product ? $parent_product->get_permalink() : '' )
                 ),
+                'productCategories'=> $this->get_product_category_slugs( $parent_id, $parent_product ),
                 'attributes'       => $variation ? $this->prepare_variation_attributes( $variation->get_attributes() ) : array(),
                 'attributeSummary' => $attribute_summary,
             );
@@ -801,9 +808,96 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'stockQuantity'    => null,
                 'backordersAllowed'=> false,
                 'permalink'        => $this->sanitize_url_value( $parent_product ? $parent_product->get_permalink() : '' ),
+                'productCategories'=> $this->get_product_category_slugs( $parent_id, $parent_product ),
                 'attributes'       => array(),
                 'attributeSummary' => '',
             );
+        }
+
+        /**
+         * Retrieve normalized product category slugs for a product.
+         *
+         * @param int        $product_id Product ID.
+         * @param WC_Product $product    Optional product instance.
+         *
+         * @return array
+         */
+        protected function get_product_category_slugs( $product_id, $product = null ) {
+            $category_ids = array();
+
+            if ( $product && method_exists( $product, 'get_category_ids' ) ) {
+                $category_ids = $product->get_category_ids();
+            } elseif ( function_exists( 'wc_get_product' ) ) {
+                $loaded = wc_get_product( $product_id );
+
+                if ( $loaded && method_exists( $loaded, 'get_category_ids' ) ) {
+                    $category_ids = $loaded->get_category_ids();
+                }
+            }
+
+            if ( empty( $category_ids ) ) {
+                return array();
+            }
+
+            $terms = get_terms(
+                array(
+                    'taxonomy'   => 'product_cat',
+                    'include'    => array_map( 'absint', $category_ids ),
+                    'hide_empty' => false,
+                )
+            );
+
+            if ( empty( $terms ) || is_wp_error( $terms ) ) {
+                return array();
+            }
+
+            $slugs = array();
+
+            foreach ( $terms as $term ) {
+                if ( ! $term || empty( $term->slug ) ) {
+                    continue;
+                }
+
+                $slug = sanitize_title( $term->slug );
+
+                if ( '' !== $slug ) {
+                    $slugs[] = $slug;
+                }
+            }
+
+            return array_values( array_unique( $slugs ) );
+        }
+
+        /**
+         * Determine whether a product entry should match the current game slug.
+         *
+         * @param array  $entry     Product entry payload.
+         * @param string $type_slug Game/type slug.
+         *
+         * @return bool
+         */
+        protected function entry_matches_game_category( array $entry, $type_slug ) {
+            if ( ! $type_slug ) {
+                return true;
+            }
+
+            $normalized_type = sanitize_title( $type_slug );
+
+            if ( '' === $normalized_type ) {
+                return true;
+            }
+
+            if ( empty( $entry['productCategories'] ) || ! is_array( $entry['productCategories'] ) ) {
+                return false;
+            }
+
+            foreach ( $entry['productCategories'] as $category_slug ) {
+                if ( sanitize_title( $category_slug ) === $normalized_type ) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /**
