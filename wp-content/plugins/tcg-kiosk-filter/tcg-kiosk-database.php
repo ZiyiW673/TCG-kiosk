@@ -1195,6 +1195,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          */
         protected function get_card_identifier_candidates( array $card, $type_slug ) {
             $candidates = array();
+            $is_one_piece = false !== strpos( strtolower( (string) $type_slug ), 'one-piece' );
 
             if ( isset( $card['id'] ) ) {
                 $candidates[] = $card['id'];
@@ -1211,6 +1212,20 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                             if ( '' !== $set_id ) {
                                 $candidates[] = $set_id . '-' . $number;
                                 $candidates[] = $set_id . $number;
+
+                                if ( $is_one_piece ) {
+                                    $normalized_set = strtolower( $set_id );
+                                    $short_set = preg_replace( '/^op[-_]?/i', '', $normalized_set );
+                                    $short_set = $short_set ? $short_set : $normalized_set;
+
+                                    $candidates[] = 'op-' . $normalized_set . '-' . $number;
+                                    $candidates[] = 'op-' . $normalized_set . '-' . $number . '-' . $short_set;
+
+                                    if ( $short_set !== $normalized_set ) {
+                                        $candidates[] = 'op-' . $short_set . '-' . $number;
+                                        $candidates[] = 'op-' . $short_set . '-' . $number . '-' . $short_set;
+                                    }
+                                }
                             }
                         }
 
