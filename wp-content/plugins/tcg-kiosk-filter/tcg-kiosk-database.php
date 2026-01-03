@@ -963,7 +963,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             $known = array( 'one-piece', 'gundam', 'riftbound', 'pokemon' );
 
             foreach ( $known as $key ) {
-                if ( false !== strpos( $normalized, $key ) ) {
+                if ( false !== strpos( $normalized, $key ) || 'onepiece' === str_replace( '-', '', $normalized ) ) {
                     return $key;
                 }
             }
