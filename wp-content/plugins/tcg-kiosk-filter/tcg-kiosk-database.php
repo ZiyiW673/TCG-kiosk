@@ -1196,6 +1196,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
         protected function get_card_identifier_candidates( array $card, $type_slug ) {
             $candidates = array();
             $is_one_piece = false !== strpos( strtolower( (string) $type_slug ), 'one-piece' );
+            $raw_id = isset( $card['id'] ) ? (string) $card['id'] : '';
 
             if ( isset( $card['id'] ) ) {
                 $candidates[] = $card['id'];
@@ -1237,6 +1238,29 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                                 $candidates[] = $ptcgo . $number;
                             }
                         }
+                    }
+                }
+            }
+
+            if ( $is_one_piece && '' !== $raw_id ) {
+                $base_id = preg_replace( '/_p\d+$/i', '', $raw_id );
+
+                if ( $base_id && preg_match( '/^([a-z]+[0-9]+)-?([0-9]+)$/i', $base_id, $matches ) ) {
+                    $set_code = strtolower( $matches[1] );
+                    $number = $matches[2];
+                    $number_trim = ltrim( $number, '0' );
+                    $number_trim = '' !== $number_trim ? $number_trim : $number;
+
+                    $candidates[] = $set_code . '-' . $number;
+                    $candidates[] = $set_code . $number;
+                    $candidates[] = 'op-' . $set_code . '-' . $number;
+                    $candidates[] = 'op-' . $set_code . '-' . $number . '-' . $set_code;
+
+                    if ( $number_trim !== $number ) {
+                        $candidates[] = $set_code . '-' . $number_trim;
+                        $candidates[] = $set_code . $number_trim;
+                        $candidates[] = 'op-' . $set_code . '-' . $number_trim;
+                        $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-' . $set_code;
                     }
                 }
             }
