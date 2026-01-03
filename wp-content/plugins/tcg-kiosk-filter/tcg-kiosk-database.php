@@ -456,12 +456,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             $product = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : null;
 
             if ( $product ) {
-                $sku = $product->get_sku();
-
-                if ( $sku ) {
-                    $identifiers[] = $sku;
-                }
-
                 $payload = $this->format_product_payload( $product );
             } else {
                 $payload = $this->format_basic_product_payload( $product_id );
@@ -541,12 +535,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $parent_identifiers[] = $parent_id;
                 }
 
-                $parent_sku = $parent_product->get_sku();
-
-                if ( $parent_sku ) {
-                    $parent_identifiers[] = $parent_sku;
-                }
-
                 $parent_meta_keys = apply_filters(
                     'tcg_kiosk_product_card_meta_keys',
                     array(
@@ -570,12 +558,6 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             }
 
             if ( $variation ) {
-                $sku = $variation->get_sku();
-
-                if ( $sku ) {
-                    $identifiers[] = $sku;
-                }
-
                 $payload = $this->format_variation_payload( $variation, $parent_product );
             } else {
                 $payload = $this->format_basic_variation_payload( $variation_id, $parent_product );
