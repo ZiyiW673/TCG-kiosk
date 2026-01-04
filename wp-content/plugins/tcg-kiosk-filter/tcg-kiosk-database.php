@@ -1198,7 +1198,13 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             $candidates = array();
             $is_one_piece = false !== strpos( strtolower( (string) $type_slug ), 'one-piece' );
             $raw_id = isset( $card['id'] ) ? (string) $card['id'] : '';
-            $is_one_piece_alt = $is_one_piece && $raw_id && preg_match( '/_p1$/i', $raw_id );
+            $parallel_suffix = '';
+
+            if ( $is_one_piece && $raw_id && preg_match( '/(_p\d+)$/i', $raw_id, $parallel_match ) ) {
+                $parallel_suffix = strtolower( $parallel_match[1] );
+            }
+
+            $is_one_piece_alt = $is_one_piece && '' !== $parallel_suffix;
 
             if ( isset( $card['id'] ) ) {
                 $candidates[] = $card['id'];
@@ -1254,16 +1260,17 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $number_trim = '' !== $number_trim ? $number_trim : $number;
 
                     if ( $is_one_piece_alt ) {
-                        $candidates[] = $set_code . '-' . $number . '-p1';
-                        $candidates[] = $set_code . $number . 'p1';
-                        $candidates[] = 'op-' . $set_code . '-' . $number . '-p1';
-                        $candidates[] = 'op-' . $set_code . '-' . $number . '-' . $set_code . '-p1';
+                        $parallel_code = ltrim( $parallel_suffix, '_' );
+                        $candidates[] = $set_code . '-' . $number . '-' . $parallel_code;
+                        $candidates[] = $set_code . $number . $parallel_code;
+                        $candidates[] = 'op-' . $set_code . '-' . $number . '-' . $parallel_code;
+                        $candidates[] = 'op-' . $set_code . '-' . $number . '-' . $set_code . '-' . $parallel_code;
 
                         if ( $number_trim !== $number ) {
-                            $candidates[] = $set_code . '-' . $number_trim . '-p1';
-                            $candidates[] = $set_code . $number_trim . 'p1';
-                            $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-p1';
-                            $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-' . $set_code . '-p1';
+                            $candidates[] = $set_code . '-' . $number_trim . '-' . $parallel_code;
+                            $candidates[] = $set_code . $number_trim . $parallel_code;
+                            $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-' . $parallel_code;
+                            $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-' . $set_code . '-' . $parallel_code;
                         }
                     } else {
                         $candidates[] = $set_code . '-' . $number;
