@@ -164,6 +164,7 @@ class TCG_Kiosk_Filter_Plugin {
                     'outOfStock' => __( 'Out of stock', 'tcg-kiosk-filter' ),
                     'notPurchasable' => __( 'This product cannot be purchased right now.', 'tcg-kiosk-filter' ),
                     'chooseVariant' => __( 'Choose a version', 'tcg-kiosk-filter' ),
+                    'allRarities' => __( 'All Rarities', 'tcg-kiosk-filter' ),
                 ),
             )
         );
@@ -219,6 +220,45 @@ header {
 
 .tcg-kiosk__type-filter[hidden] {
     display: none;
+}
+
+.tcg-kiosk__rarity-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.tcg-kiosk__rarity-filter[hidden] {
+    display: none !important;
+}
+
+.tcg-kiosk__rarity-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.tcg-kiosk__rarity-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tcg-kiosk__rarity-button {
+    border: 1px solid #c3c4c7;
+    background: #fff;
+    color: #1d2327;
+    border-radius: 999px;
+    padding: 0.3rem 0.85rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.tcg-kiosk__rarity-button.is-active {
+    background: #1d2327;
+    color: #fff;
+    border-color: #1d2327;
 }
 
 .tcg-kiosk__type-options {
@@ -356,15 +396,39 @@ header {
 }
 
 .tcg-kiosk__card-overlay-price {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: baseline;
     font-size: 1.25rem;
     font-weight: 700;
     color: #111;
+}
+
+.tcg-kiosk__card-overlay-price-amount {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: baseline;
+}
+
+.tcg-kiosk__card-overlay-price-stock {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #1d2327;
+}
+
+.tcg-kiosk__card-overlay-selection {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
 }
 
 .tcg-kiosk__card-overlay-variant {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+    flex: 1 1 260px;
 }
 
 .tcg-kiosk__card-overlay-variant-label {
@@ -383,6 +447,37 @@ header {
 }
 
 .tcg-kiosk__card-overlay-variant-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tcg-kiosk__card-overlay-quantity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 0 1 160px;
+}
+
+.tcg-kiosk__card-overlay-quantity-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #1d2327;
+    text-transform: uppercase;
+}
+
+.tcg-kiosk__card-overlay-quantity-input {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    background-color: #fff;
+    color: #1d2327;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.tcg-kiosk__card-overlay-quantity-input:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
@@ -683,17 +778,24 @@ header {
 .tcg-kiosk__actions {
     flex: 0 0 25%;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 1rem;
     margin-top: 14px;
+}
+
+.tcg-kiosk__actions-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    width: 100%;
+    flex-wrap: wrap;
 }
 
 .tcg-kiosk__search {
     position: relative;
     display: flex;
-    width: 80%;
-    height: 80%;
-    margin-top: 16px;
+    width: 100%;
+    flex: 1 1 auto;
 }
 
 .tcg-kiosk__search input[type="search"] {
@@ -705,14 +807,35 @@ header {
     flex-direction: column;
     font-weight: 600;
     color: #1d2327;
-    width: 18%;
-    margin-right: 0;
-    margin-left: auto;
-    font-size: 9px;
+    font-size: 0.75rem;
+    min-width: 0;
+    flex: 0 1 auto;
 }
 
 .tcg-kiosk__page-size select {
     margin-top: 0.35rem;
+}
+
+.tcg-kiosk__pagination {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1 1 auto;
+}
+
+.tcg-kiosk__page-jump {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+    color: #1d2327;
+    font-size: 0.9rem;
+}
+
+.tcg-kiosk__page-jump input[type="number"] {
+    width: 4.5rem;
+    padding: 4px 8px;
 }
 
 .tcg-kiosk__grid {
@@ -722,9 +845,19 @@ header {
     gap: var(--tcg-gap);
     grid-template-columns: repeat(var(--tcg-card-columns), minmax(0, 1fr));
     grid-template-rows: repeat(var(--tcg-card-rows), minmax(0, 1fr));
+    grid-auto-rows: minmax(0, 1fr);
     align-items: stretch;
     justify-items: stretch;
     overflow: hidden;
+}
+
+.tcg-kiosk[data-page-size="4"] {
+    --tcg-gap: 1.15rem;
+}
+
+.tcg-kiosk[data-page-size="4"] .tcg-kiosk__grid {
+    --tcg-card-columns: 2;
+    --tcg-card-rows: 2;
 }
 
 .tcg-kiosk[data-page-size="10"] .tcg-kiosk__grid {
@@ -771,9 +904,27 @@ header {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    height: 100%;
+    aspect-ratio: 63 / 88;
+    height: auto;
     min-height: 0;
     cursor: pointer;
+    position: relative;
+}
+
+.tcg-kiosk__card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #f0f2f5 25%, #e6e8eb 37%, #f0f2f5 63%);
+    background-size: 400% 100%;
+    animation: tcg-kiosk-skeleton 1.2s ease-in-out infinite;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.tcg-kiosk__card--loading::after {
+    opacity: 1;
 }
 
 .tcg-kiosk__card img {
@@ -783,6 +934,12 @@ header {
     flex: 1 1 auto;
     border-radius: 0;
     object-fit: contain;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+.tcg-kiosk__card--loading img {
+    opacity: 0;
 }
 
 .tcg-kiosk__card:focus-visible {
@@ -790,17 +947,36 @@ header {
     outline-offset: 4px;
 }
 
+.tcg-kiosk__card-price {
+    position: absolute;
+    top: 50%;
+    right: 0.5rem;
+    background-color: rgba(29, 35, 39, 0.88);
+    color: #fff;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    z-index: 2;
+    transform: translateY(-50%);
+}
+
+@keyframes tcg-kiosk-skeleton {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
 .tcg-kiosk__empty {
     margin: 0;
     font-style: italic;
     color: #50575e;
-}
-
-.tcg-kiosk__pagination {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    justify-content: center;
 }
 
 .tcg-kiosk__page-button {
@@ -844,6 +1020,36 @@ header {
     .tcg-kiosk__type-filter,
     .tcg-kiosk__actions {
         flex: 1 1 100%;
+    }
+
+    .tcg-kiosk__actions-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tcg-kiosk__pagination {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .tcg-kiosk__page-size,
+    .tcg-kiosk__page-status,
+    .tcg-kiosk__page-jump,
+    .tcg-kiosk__page-button {
+        display: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .tcg-kiosk {
+        height: auto !important;
+        max-height: none !important;
+        grid-template-rows: auto auto auto;
+        overflow: visible !important;
+    }
+
+    .tcg-kiosk__grid {
+        overflow: visible !important;
     }
 }
 
@@ -893,6 +1099,8 @@ CSS;
   const setSelect = document.getElementById( 'tcg-kiosk-set' );
   const typeFilterWrapper = document.getElementById( 'tcg-kiosk-type-filter' );
   const typeOptionsContainer = document.getElementById( 'tcg-kiosk-type-options' );
+  const rarityFilterWrapper = document.getElementById( 'tcg-kiosk-rarity-filter' );
+  const rarityOptionsContainer = document.getElementById( 'tcg-kiosk-rarity-options' );
   const searchInput = document.getElementById( 'tcg-kiosk-search' );
   const pageSizeSelect = document.getElementById( 'tcg-kiosk-page-size' );
   const pageSizeLabel = document.querySelector( 'label[for="tcg-kiosk-page-size"] span' );
@@ -913,6 +1121,8 @@ CSS;
   const cardOverlayVariantContainer = document.getElementById( 'tcg-kiosk-card-overlay-variant' );
   const cardOverlayVariantLabel = document.getElementById( 'tcg-kiosk-card-overlay-variant-label' );
   const cardOverlayVariantSelect = document.getElementById( 'tcg-kiosk-card-overlay-variant-select' );
+  const cardOverlayQuantityContainer = document.getElementById( 'tcg-kiosk-card-overlay-quantity' );
+  const cardOverlayQuantityInput = document.getElementById( 'tcg-kiosk-card-overlay-quantity-input' );
   const cardOverlayAddToCart = document.getElementById( 'tcg-kiosk-card-overlay-add-to-cart' );
   const cardOverlayCommerceMessage = document.getElementById( 'tcg-kiosk-card-overlay-commerce-message' );
   const typeIconConfig = window.tcgKioskData.typeIcons || {};
@@ -948,12 +1158,13 @@ CSS;
   let currentCommerceCard = null;
   let currentCommerceEntries = [];
   let currentCommerceSelectionIndex = -1;
+  let currentQuantityValue = 1;
   let isAddingToCart = false;
   const ONE_PIECE_COLOR_FOREGROUND = new Map( [
     [ 'yellow', '#1d2327' ],
   ] );
 
-  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
+  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! rarityFilterWrapper || ! rarityOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
   }
 
@@ -964,19 +1175,150 @@ CSS;
     i18n.typeLabel ||
     'Type';
   let currentTypeLabel = DEFAULT_TYPE_LABEL;
+  const ALLOWED_PAGE_SIZES = [ 4, 10, 12, 16, 20 ];
+  const MOBILE_PAGE_SIZE = 4;
+  const MOBILE_CARD_BUFFER = 16;
+  const mobilePageQuery = window.matchMedia( '(max-width: 900px)' );
   const DEFAULT_PAGE_SIZE = parseInt( pageSizeSelect.value, 10 ) || 10;
   let cardsPerPage = DEFAULT_PAGE_SIZE;
+  let desktopPageSize = DEFAULT_PAGE_SIZE;
   let hasInteracted = false;
   let currentPage = 1;
   let selectedTypeValue = '';
+  let selectedRarityValue = '';
   let lastFocusedCard = null;
+  let pendingPriceBadgeAnimationFrame = null;
+  let filteredCardsCache = [];
+  let mobileScrollListenerAttached = false;
+  let isMobileAppendingPage = false;
+
+  function getMobileBufferPageCount() {
+    if ( cardsPerPage <= 0 ) {
+      return 2;
+    }
+
+    return Math.max( 2, Math.ceil( MOBILE_CARD_BUFFER / cardsPerPage ) );
+  }
+
+  function handleMobileScroll() {
+    if ( ! mobilePageQuery.matches ) {
+      detachMobileScrollListener();
+      return;
+    }
+
+    const totalPages = Math.ceil( filteredCardsCache.length / cardsPerPage );
+
+    if ( currentPage >= totalPages || totalPages <= 1 ) {
+      detachMobileScrollListener();
+      return;
+    }
+
+    let scrollPosition = window.scrollY + window.innerHeight;
+    let threshold = document.documentElement.scrollHeight - 200;
+    const bufferPages = getMobileBufferPageCount();
+    const targetPage = Math.min( totalPages, currentPage + bufferPages );
+
+    if ( scrollPosition < threshold || isMobileAppendingPage ) {
+      return;
+    }
+
+    isMobileAppendingPage = true;
+
+    let safetyCounter = 0;
+
+    while ( currentPage < targetPage && safetyCounter < 5 ) {
+      currentPage += 1;
+      renderCards( true );
+      safetyCounter += 1;
+    }
+
+    isMobileAppendingPage = false;
+  }
+
+  function attachMobileScrollListener() {
+    if ( mobileScrollListenerAttached ) {
+      return;
+    }
+
+    window.addEventListener( 'scroll', handleMobileScroll, { passive: true } );
+    mobileScrollListenerAttached = true;
+  }
+
+  function detachMobileScrollListener() {
+    if ( ! mobileScrollListenerAttached ) {
+      return;
+    }
+
+    window.removeEventListener( 'scroll', handleMobileScroll );
+    mobileScrollListenerAttached = false;
+  }
+
+  function maybeAutoAppendForShortScreens( totalPages ) {
+    if ( ! mobilePageQuery.matches ) {
+      return;
+    }
+
+    if ( isMobileAppendingPage || currentPage >= totalPages || totalPages <= 1 ) {
+      return;
+    }
+
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    let documentHeight = document.documentElement.scrollHeight || 0;
+    const heightBuffer = 320;
+    const bufferPages = getMobileBufferPageCount();
+    const targetPage = Math.min( totalPages, currentPage + bufferPages );
+
+    if ( documentHeight > viewportHeight + heightBuffer && currentPage >= targetPage ) {
+      return;
+    }
+
+    isMobileAppendingPage = true;
+
+    let safetyCounter = 0;
+
+    while (
+      ( documentHeight <= viewportHeight + heightBuffer || currentPage < targetPage ) &&
+      currentPage < totalPages &&
+      safetyCounter < 8
+    ) {
+      currentPage += 1;
+      renderCards( true );
+      safetyCounter += 1;
+      documentHeight = document.documentElement.scrollHeight || 0;
+    }
+
+    isMobileAppendingPage = false;
+  }
 
   function applyPageSizeLayout() {
-    const normalized = [ 10, 12, 16, 20 ].includes( cardsPerPage ) ? cardsPerPage : 10;
-    cardsPerPage = normalized;
-    kioskRoot.dataset.pageSize = String( normalized );
-    if ( pageSizeSelect.value !== String( normalized ) ) {
-      pageSizeSelect.value = String( normalized );
+    const normalizedPageSize = ALLOWED_PAGE_SIZES.includes( cardsPerPage )
+      ? cardsPerPage
+      : DEFAULT_PAGE_SIZE;
+
+    if ( mobilePageQuery.matches ) {
+      cardsPerPage = MOBILE_PAGE_SIZE;
+    } else {
+      desktopPageSize = normalizedPageSize;
+      cardsPerPage = normalizedPageSize;
+    }
+
+    const appliedPageSize = mobilePageQuery.matches ? MOBILE_PAGE_SIZE : cardsPerPage;
+
+    kioskRoot.dataset.pageSize = String( appliedPageSize );
+
+    if ( pageSizeSelect.value !== String( appliedPageSize ) ) {
+      pageSizeSelect.value = String( appliedPageSize );
+    }
+  }
+
+  function handleMobilePageSizeChange() {
+    const previousPageSize = cardsPerPage;
+
+    applyPageSizeLayout();
+
+    if ( previousPageSize !== cardsPerPage ) {
+      currentPage = 1;
+      renderCards();
     }
   }
 
@@ -1169,6 +1511,7 @@ CSS;
     currentCommerceCard = null;
     currentCommerceEntries = [];
     currentCommerceSelectionIndex = -1;
+    currentQuantityValue = 1;
     isAddingToCart = false;
 
     if ( cardOverlayCommerce ) {
@@ -1194,6 +1537,16 @@ CSS;
       cardOverlayVariantLabel.textContent = i18n.chooseVariant;
     }
 
+    if ( cardOverlayQuantityContainer ) {
+      cardOverlayQuantityContainer.hidden = true;
+    }
+
+    if ( cardOverlayQuantityInput ) {
+      cardOverlayQuantityInput.value = '1';
+      cardOverlayQuantityInput.disabled = true;
+      cardOverlayQuantityInput.removeAttribute( 'max' );
+    }
+
     if ( cardOverlayAddToCart ) {
       cardOverlayAddToCart.disabled = true;
       cardOverlayAddToCart.textContent = i18n.addToCart || 'Add to cart';
@@ -1209,14 +1562,8 @@ CSS;
   }
 
   function getEntryDisplayName( entry ) {
-    if ( entry ) {
-      if ( entry.attributeSummary ) {
-        return entry.attributeSummary;
-      }
-
-      if ( entry.name ) {
-        return entry.name;
-      }
+    if ( entry && entry.name ) {
+      return entry.name;
     }
 
     if ( currentCommerceCard && currentCommerceCard.name ) {
@@ -1230,10 +1577,6 @@ CSS;
     const candidates = [];
 
     if ( entry ) {
-      if ( entry.attributeSummary ) {
-        candidates.push( entry.attributeSummary );
-      }
-
       if ( entry.name ) {
         candidates.push( entry.name );
       }
@@ -1256,16 +1599,190 @@ CSS;
     return 'Option ' + String( index + 1 );
   }
 
+  function resolveBooleanFlag( entry, keys ) {
+    if ( ! entry || 'object' !== typeof entry || ! Array.isArray( keys ) ) {
+      return null;
+    }
+
+    for ( let index = 0; index < keys.length; index += 1 ) {
+      const key = keys[ index ];
+
+      if ( Object.prototype.hasOwnProperty.call( entry, key ) ) {
+        return !! entry[ key ];
+      }
+    }
+
+    return null;
+  }
+
+  function getEntryStockState( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return { purchasableFlag: null, inStock: null, backordersOk: false };
+    }
+
+    const purchasableFlag = resolveBooleanFlag( entry, [ 'isPurchasable', 'is_purchasable', 'purchasable' ] );
+    const inStockFlag = resolveBooleanFlag( entry, [ 'isInStock', 'is_in_stock', 'in_stock' ] );
+    const backordersAllowedFlag = resolveBooleanFlag( entry, [ 'backordersAllowed', 'backorders_allowed' ] );
+    const manageStockFlag = resolveBooleanFlag( entry, [ 'manage_stock', 'manageStock', 'managing_stock' ] );
+    const stockQuantity = getEntryAvailableStock( entry );
+
+    let backordersAllowed = backordersAllowedFlag;
+
+    if ( null === backordersAllowed && 'string' === typeof entry.backorders ) {
+      backordersAllowed = entry.backorders.toLowerCase() !== 'no';
+    }
+
+    const stockStatus = ( entry.stock_status || entry.stockStatus || '' ).toString().toLowerCase();
+    const hasKnownStock = Number.isInteger( stockQuantity );
+    const manageStock = true === manageStockFlag ? true : false === manageStockFlag ? false : null;
+
+    let inStock = null;
+
+    if ( true === manageStock ) {
+      if ( hasKnownStock ) {
+        inStock = stockQuantity > 0;
+      } else if ( stockStatus ) {
+        inStock = 'instock' === stockStatus;
+      }
+    }
+
+    if ( null === inStock && false === manageStock ) {
+      if ( stockStatus ) {
+        inStock = 'instock' === stockStatus;
+      } else if ( hasKnownStock ) {
+        inStock = stockQuantity > 0;
+      }
+    }
+
+    if ( null === inStock ) {
+      if ( stockStatus ) {
+        inStock = 'instock' === stockStatus;
+      } else if ( hasKnownStock ) {
+        inStock = stockQuantity > 0;
+      }
+    }
+
+    return {
+      purchasableFlag,
+      inStock,
+      backordersOk: !! backordersAllowed,
+    };
+  }
+
   function isEntryPurchasable( entry ) {
     if ( ! entry || 'object' !== typeof entry ) {
       return false;
     }
 
-    const purchasable = !! entry.isPurchasable;
-    const inStock = !! entry.isInStock;
-    const backordersAllowed = !! entry.backordersAllowed;
+    const { purchasableFlag, inStock, backordersOk } = getEntryStockState( entry );
+    const purchasable = null === purchasableFlag ? true : !! purchasableFlag;
 
-    return purchasable && ( inStock || backordersAllowed );
+    if ( false === purchasableFlag ) {
+      return false;
+    }
+
+    if ( false === inStock ) {
+      return purchasable && backordersOk;
+    }
+
+    return purchasable || backordersOk;
+  }
+
+  function isEntryInStockForDisplay( entry ) {
+    const { purchasableFlag, inStock, backordersOk } = getEntryStockState( entry );
+
+    if ( false === purchasableFlag ) {
+      return false;
+    }
+
+    if ( false === inStock ) {
+      return !! backordersOk;
+    }
+
+    return true;
+  }
+
+  function cardHasInStockProducts( card ) {
+    if ( ! card || 'object' !== typeof card ) {
+      return false;
+    }
+
+    if ( ! Array.isArray( card.products ) || ! card.products.length ) {
+      return false;
+    }
+
+    const entries = normalizeProductEntries( card.products );
+
+    if ( ! entries.length ) {
+      return false;
+    }
+
+    return entries.some( ( entry ) => isEntryInStockForDisplay( entry ) );
+  }
+
+  function pruneVariationParentEntries( entries ) {
+    if ( ! Array.isArray( entries ) || entries.length < 2 ) {
+      return Array.isArray( entries ) ? entries : [];
+    }
+
+    const parentIdsWithVariations = new Set();
+
+    entries.forEach( ( entry ) => {
+      if ( ! entry || 'object' !== typeof entry ) {
+        return;
+      }
+
+      const hasVariationId =
+        toPositiveInt( entry.variationId ) ||
+        toPositiveInt( entry.variation_id ) ||
+        toPositiveInt( entry.variationID );
+      const isVariationType =
+        entry.type === 'variation' || entry.type === 'product_variation';
+
+      if ( ! hasVariationId && ! isVariationType ) {
+        return;
+      }
+
+      const parentId = getEntryParentId( entry );
+
+      if ( parentId ) {
+        parentIdsWithVariations.add( parentId );
+      }
+    } );
+
+    if ( ! parentIdsWithVariations.size ) {
+      return entries;
+    }
+
+    const filtered = entries.filter( ( entry ) => {
+      if ( ! entry || 'object' !== typeof entry ) {
+        return false;
+      }
+
+      if ( entry.type !== 'variable' ) {
+        return true;
+      }
+
+      if ( toPositiveInt( entry.variationId ) || toPositiveInt( entry.variation_id ) ) {
+        return true;
+      }
+
+      const candidateParentId = getEntryParentId( entry );
+
+      if ( candidateParentId && parentIdsWithVariations.has( candidateParentId ) ) {
+        return false;
+      }
+
+      return true;
+    } );
+
+    return filtered.length ? filtered : entries;
+  }
+
+  function normalizeProductEntries( entries ) {
+    const expanded = expandEntriesWithNestedVariations( entries );
+
+    return pruneVariationParentEntries( expanded );
   }
 
   function showCommerceMessage( message, status ) {
@@ -1296,28 +1813,177 @@ CSS;
     }
   }
 
+  function formatStockLabel( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return '';
+    }
+
+    const quantity = Number.parseInt( entry.stockQuantity, 10 );
+
+    if ( Number.isInteger( quantity ) ) {
+      const safeQuantity = quantity < 0 ? 0 : quantity;
+
+      if ( 1 === safeQuantity ) {
+        return '1 left';
+      }
+
+      return `${ safeQuantity } left`;
+    }
+
+    if ( false === entry.isInStock ) {
+      return i18n.outOfStock || 'Out of stock';
+    }
+
+    return '';
+  }
+
+  function getEntryAvailableStock( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return null;
+    }
+
+    const candidates = [
+      entry.stockQuantity,
+      entry.stock_quantity,
+      entry.stock,
+      entry.quantityAvailable,
+      entry.quantity_available,
+      entry.qty,
+      entry.maxPurchaseQuantity,
+      entry.max_purchase_quantity,
+      entry.max_qty,
+    ];
+
+    for ( const candidate of candidates ) {
+      const parsed = Number.parseInt( candidate, 10 );
+
+      if ( Number.isInteger( parsed ) ) {
+        return parsed < 0 ? 0 : parsed;
+      }
+    }
+
+    return null;
+  }
+
+  function clampQuantityForEntry( value, entry ) {
+    const min = 1;
+    let quantity = Number.parseInt( value, 10 );
+
+    if ( ! Number.isInteger( quantity ) || quantity < min ) {
+      quantity = min;
+    }
+
+    const stockLimit = getEntryAvailableStock( entry );
+
+    if ( 'number' === typeof stockLimit && stockLimit > 0 && quantity > stockLimit ) {
+      quantity = stockLimit;
+    }
+
+    return quantity;
+  }
+
+  function updateQuantityControl( entry, options ) {
+    if ( ! cardOverlayQuantityInput || ! cardOverlayQuantityContainer ) {
+      return;
+    }
+
+    const resetValue = !! ( options && options.resetValue );
+
+    if ( resetValue ) {
+      currentQuantityValue = 1;
+    }
+
+    if ( ! entry ) {
+      cardOverlayQuantityContainer.hidden = true;
+      cardOverlayQuantityInput.value = '1';
+      cardOverlayQuantityInput.disabled = true;
+      cardOverlayQuantityInput.removeAttribute( 'max' );
+      currentQuantityValue = 1;
+      return;
+    }
+
+    cardOverlayQuantityContainer.hidden = false;
+
+    const stockLimit = getEntryAvailableStock( entry );
+    let nextQuantity = resetValue ? 1 : clampQuantityForEntry( currentQuantityValue, entry );
+
+    if ( 'number' === typeof stockLimit && stockLimit > 0 ) {
+      cardOverlayQuantityInput.max = String( stockLimit );
+
+      if ( nextQuantity > stockLimit ) {
+        nextQuantity = stockLimit;
+      }
+    } else {
+      cardOverlayQuantityInput.removeAttribute( 'max' );
+    }
+
+    if ( nextQuantity < 1 ) {
+      nextQuantity = 1;
+    }
+
+    currentQuantityValue = nextQuantity;
+    cardOverlayQuantityInput.value = String( nextQuantity );
+    cardOverlayQuantityInput.disabled = ! isEntryPurchasable( entry );
+  }
+
+  function getSelectedQuantityValue() {
+    const entry = currentCommerceEntries[ currentCommerceSelectionIndex ] || null;
+
+    if ( ! entry ) {
+      return 1;
+    }
+
+    const quantity = clampQuantityForEntry( currentQuantityValue, entry );
+    currentQuantityValue = quantity;
+
+    if ( cardOverlayQuantityInput ) {
+      cardOverlayQuantityInput.value = String( quantity );
+    }
+
+    return quantity;
+  }
+
   function setPriceDisplay( entry ) {
     if ( ! cardOverlayPrice ) {
       return;
     }
 
-    let html = '';
+    cardOverlayPrice.innerHTML = '';
+    cardOverlayPrice.hidden = true;
 
-    if ( entry ) {
-      if ( entry.priceHtml ) {
-        html = entry.priceHtml;
-      } else if ( entry.price ) {
-        html = ( entry.currencySymbol || '' ) + String( entry.price );
-      }
+    if ( ! entry ) {
+      return;
     }
 
-    if ( html ) {
-      cardOverlayPrice.innerHTML = html;
-      cardOverlayPrice.hidden = false;
-    } else {
-      cardOverlayPrice.innerHTML = '';
-      cardOverlayPrice.hidden = true;
+    let priceHtml = '';
+
+    if ( entry.priceHtml ) {
+      priceHtml = entry.priceHtml;
+    } else if ( entry.price ) {
+      priceHtml = ( entry.currencySymbol || '' ) + String( entry.price );
     }
+
+    if ( ! priceHtml ) {
+      return;
+    }
+
+    const stockLabel = formatStockLabel( entry );
+    const fragment = document.createDocumentFragment();
+
+    const amountSpan = document.createElement( 'span' );
+    amountSpan.className = 'tcg-kiosk__card-overlay-price-amount';
+    amountSpan.innerHTML = priceHtml;
+    fragment.appendChild( amountSpan );
+
+    if ( stockLabel ) {
+      const stockSpan = document.createElement( 'span' );
+      stockSpan.className = 'tcg-kiosk__card-overlay-price-stock';
+      stockSpan.textContent = stockLabel;
+      fragment.appendChild( stockSpan );
+    }
+
+    cardOverlayPrice.appendChild( fragment );
+    cardOverlayPrice.hidden = false;
   }
 
   function updateAddToCartButtonState( entry ) {
@@ -1357,6 +2023,7 @@ CSS;
       cardOverlayVariantSelect.value = String( nextIndex );
     }
 
+    updateQuantityControl( entry, { resetValue: true } );
     setPriceDisplay( entry );
     showCommerceMessage( '', '' );
 
@@ -1377,13 +2044,24 @@ CSS;
     }
 
     if ( window.ajaxurl ) {
-      const ajaxUrl = String( window.ajaxurl );
+      try {
+        const ajaxUrl = new URL( window.ajaxurl, window.location.href );
 
-      if ( ajaxUrl.includes( '%%endpoint%%' ) ) {
-        return ajaxUrl.replace( '%%endpoint%%', 'add_to_cart' );
+        if ( ! ajaxUrl.searchParams.has( 'action' ) ) {
+          ajaxUrl.searchParams.set( 'action', 'woocommerce_add_to_cart' );
+        }
+
+        return ajaxUrl.toString();
+      } catch ( error ) {
+        const ajaxUrl = String( window.ajaxurl );
+        const separator = ajaxUrl.includes( '?' ) ? '&' : '?';
+
+        if ( ajaxUrl.includes( 'action=' ) ) {
+          return ajaxUrl;
+        }
+
+        return `${ ajaxUrl }${ separator }action=woocommerce_add_to_cart`;
       }
-
-      return ajaxUrl;
     }
 
     try {
@@ -1395,36 +2073,346 @@ CSS;
     }
   }
 
-  function buildAddToCartPayload( entry ) {
+  function shouldIncludeAddToCartParam( endpoint ) {
+    if ( ! endpoint ) {
+      return true;
+    }
+
+    try {
+      const url = new URL( endpoint, window.location.href );
+      const ajaxParam = url.searchParams.get( 'wc-ajax' ) || url.searchParams.get( 'wc_ajax' );
+      const actionParam = url.searchParams.get( 'action' );
+
+      if ( 'add_to_cart' === ajaxParam ) {
+        return false;
+      }
+
+      if ( 'woocommerce_add_to_cart' === actionParam ) {
+        return false;
+      }
+
+      const serialized = url.toString();
+
+      if ( serialized.includes( 'wc-ajax=add_to_cart' ) || serialized.includes( 'wc_ajax=add_to_cart' ) ) {
+        return false;
+      }
+
+      if ( serialized.includes( 'action=woocommerce_add_to_cart' ) ) {
+        return false;
+      }
+    } catch ( error ) {
+      const normalized = String( endpoint );
+
+      if ( normalized.includes( 'wc-ajax=add_to_cart' ) || normalized.includes( 'wc_ajax=add_to_cart' ) ) {
+        return false;
+      }
+
+      if ( normalized.includes( 'action=woocommerce_add_to_cart' ) ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+
+  function toPositiveInt( value ) {
+    const parsed = Number.parseInt( value, 10 );
+
+    return Number.isInteger( parsed ) && parsed > 0 ? parsed : 0;
+  }
+
+  function getEntryId( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return 0;
+    }
+
+    return (
+      toPositiveInt( entry.id ) ||
+      toPositiveInt( entry.ID ) ||
+      toPositiveInt( entry.productId ) ||
+      toPositiveInt( entry.product_id ) ||
+      0
+    );
+  }
+
+  function getEntryParentId( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return 0;
+    }
+
+    const candidates = [
+      entry.parentId,
+      entry.parent_id,
+      entry.parentID,
+      entry.variationParentId,
+      entry.variation_parent_id,
+      entry.variationParentID,
+      entry.productId,
+      entry.product_id,
+    ];
+
+    for ( const candidate of candidates ) {
+      const parsed = toPositiveInt( candidate );
+
+      if ( parsed ) {
+        return parsed;
+      }
+    }
+
+    return 0;
+  }
+
+  function expandEntriesWithNestedVariations( entries ) {
+    if ( ! Array.isArray( entries ) || ! entries.length ) {
+      return Array.isArray( entries ) ? entries : [];
+    }
+
+    const normalized = entries
+      .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
+      .filter( Boolean );
+    const result = [];
+    const seen = new Set();
+
+    const normalizeGroup = ( group ) => {
+      if ( Array.isArray( group ) ) {
+        return group;
+      }
+
+      if ( group && 'object' === typeof group ) {
+        return Object.values( group );
+      }
+
+      return [];
+    };
+
+    const addEntry = ( entry, parentIdHint ) => {
+      if ( ! entry || 'object' !== typeof entry ) {
+        return;
+      }
+
+      const variationId = getEntryVariationId( entry );
+      const entryId = getEntryId( entry );
+      const dedupeKey = variationId || entryId;
+
+      if ( dedupeKey && seen.has( dedupeKey ) ) {
+        return;
+      }
+
+      if ( dedupeKey ) {
+        seen.add( dedupeKey );
+      }
+
+      const parentId = getEntryParentId( entry ) || parentIdHint || 0;
+
+      if ( parentId && ! getEntryParentId( entry ) ) {
+        entry.parent_id = parentId;
+      }
+
+      if ( ! entry.type && ( variationId || parentId ) ) {
+        entry.type = 'product_variation';
+      }
+
+      result.push( entry );
+    };
+
+    normalized.forEach( ( entry ) => {
+      const parentId = getEntryId( entry );
+
+      addEntry( entry, 0 );
+
+      const variationGroups = [
+        entry.variations,
+        entry.availableVariations,
+        entry.available_variations,
+        entry.childVariations,
+        entry.child_variations,
+        entry.productVariations,
+        entry.product_variations,
+        entry.children,
+        entry.variation_options,
+      ];
+
+      variationGroups.forEach( ( group ) => {
+        const groupEntries = normalizeGroup( group );
+
+        if ( ! Array.isArray( groupEntries ) || ! groupEntries.length ) {
+          return;
+        }
+
+        groupEntries.forEach( ( child ) => {
+          if ( ! child || 'object' !== typeof child ) {
+            return;
+          }
+
+          const clone = Object.assign( {}, child );
+
+          addEntry( clone, parentId );
+        } );
+      } );
+    } );
+
+    return result;
+  }
+
+  function isLikelyVariationObject( value ) {
+    if ( ! value || 'object' !== typeof value ) {
+      return false;
+    }
+
+    if (
+      value.type === 'variation' ||
+      value.type === 'product_variation' ||
+      value.isVariation ||
+      value.is_variation
+    ) {
+      return true;
+    }
+
+    if ( getEntryParentId( value ) ) {
+      return true;
+    }
+
+    if (
+      toPositiveInt( value.variationId ) ||
+      toPositiveInt( value.variation_id ) ||
+      toPositiveInt( value.variationID )
+    ) {
+      return true;
+    }
+
+    if ( 'object' === typeof value.attributes && Object.keys( value.attributes ).length ) {
+      return true;
+    }
+
+    if ( 'object' === typeof value.selectedAttributes && Object.keys( value.selectedAttributes ).length ) {
+      return true;
+    }
+
+    if ( 'object' === typeof value.variationAttributes && Object.keys( value.variationAttributes ).length ) {
+      return true;
+    }
+
+    if ( 'object' === typeof value.attribute_data && Object.keys( value.attribute_data ).length ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function getEntryVariationId( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return 0;
+    }
+
+    const candidates = [
+      entry.selectedVariationId,
+      entry.selected_variation_id,
+      entry.variationId,
+      entry.variation_id,
+      entry.variationID,
+    ];
+    const variationLike = isLikelyVariationObject( entry );
+
+    if ( variationLike ) {
+      candidates.push( entry.id, entry.ID );
+    }
+
+    if ( entry.selectedVariation && 'object' === typeof entry.selectedVariation ) {
+      candidates.push(
+        entry.selectedVariation.variationId,
+        entry.selectedVariation.variation_id,
+        entry.selectedVariation.id
+      );
+    }
+
+    if ( entry.variation && 'object' === typeof entry.variation ) {
+      candidates.push(
+        entry.variation.variationId,
+        entry.variation.variation_id,
+        entry.variation.id
+      );
+    }
+
+    for ( const candidate of candidates ) {
+      const parsed = toPositiveInt( candidate );
+
+      if ( parsed ) {
+        return parsed;
+      }
+    }
+
+    return 0;
+  }
+
+  function resolveVariationSource( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return null;
+    }
+
+    if ( entry.selectedVariation && 'object' === typeof entry.selectedVariation ) {
+      return entry.selectedVariation;
+    }
+
+    if ( entry.selected_variation && 'object' === typeof entry.selected_variation ) {
+      return entry.selected_variation;
+    }
+
+    if ( entry.currentVariation && 'object' === typeof entry.currentVariation ) {
+      return entry.currentVariation;
+    }
+
+    if ( entry.variation && 'object' === typeof entry.variation ) {
+      return entry.variation;
+    }
+
+    if ( entry.type === 'variation' ) {
+      return entry;
+    }
+
+    return null;
+  }
+
+  function buildAddToCartPayload( entry, options, quantityOverride ) {
     const params = new URLSearchParams();
 
     if ( ! entry ) {
       return params;
     }
 
-    const productId = entry.productId || entry.parentId || entry.variationId;
+    const includeAddToCartParam = options && options.includeAddToCartParam;
+
+    const variationReference = resolveVariationSource( entry ) || entry;
+    const variationId = getEntryVariationId( variationReference );
+
+    let productId = 0;
+
+    if ( variationId ) {
+      productId = variationId;
+    }
+
+    if ( ! productId ) {
+      productId =
+        toPositiveInt( entry.productId ) ||
+        toPositiveInt( entry.product_id ) ||
+        ( entry.product && 'object' === typeof entry.product
+          ? toPositiveInt( entry.product.id ) || toPositiveInt( entry.product.ID )
+          : 0 ) ||
+        toPositiveInt( entry.id ) ||
+        toPositiveInt( entry.ID );
+    }
 
     if ( productId ) {
       params.set( 'product_id', String( productId ) );
     }
 
-    if ( entry.variationId ) {
-      params.set( 'variation_id', String( entry.variationId ) );
+    if ( includeAddToCartParam && productId ) {
+      params.set( 'add-to-cart', String( productId ) );
     }
 
-    params.set( 'quantity', '1' );
-
-    if ( entry.attributes && 'object' === typeof entry.attributes ) {
-      Object.keys( entry.attributes ).forEach( ( key ) => {
-        const value = entry.attributes[ key ];
-
-        if ( ! key || ! value ) {
-          return;
-        }
-
-        params.set( key, value );
-      } );
-    }
+    const quantity =
+      toPositiveInt( quantityOverride ) || toPositiveInt( entry.quantity ) || 1;
+    params.set( 'quantity', String( quantity ) );
 
     return params;
   }
@@ -1439,12 +2427,16 @@ CSS;
     if ( isAddingToCart ) {
       cardOverlayAddToCart.textContent = i18n.addingToCart || 'Adding…';
       cardOverlayAddToCart.disabled = true;
+      if ( cardOverlayQuantityInput ) {
+        cardOverlayQuantityInput.disabled = true;
+      }
       return;
     }
 
     const entry = currentCommerceEntries[ currentCommerceSelectionIndex ] || null;
     cardOverlayAddToCart.textContent = i18n.addToCart || 'Add to cart';
     cardOverlayAddToCart.disabled = ! isEntryPurchasable( entry );
+    updateQuantityControl( entry, { resetValue: false } );
   }
 
   function formatAddedMessage( entry ) {
@@ -1465,9 +2457,7 @@ CSS;
       return;
     }
 
-    const entries = card.products
-      .map( ( entry ) => ( entry && 'object' === typeof entry ? entry : null ) )
-      .filter( Boolean );
+    let entries = normalizeProductEntries( card.products );
 
     if ( ! entries.length ) {
       return;
@@ -1484,23 +2474,37 @@ CSS;
       cardOverlayVariantLabel.textContent = i18n.chooseVariant;
     }
 
+    const shouldShowVariantSelect = ( () => {
+      if ( entries.length > 1 ) {
+        return true;
+      }
+
+      if ( 1 === entries.length ) {
+        const onlyEntry = entries[ 0 ];
+
+        return isLikelyVariationObject( onlyEntry );
+      }
+
+      return false;
+    } )();
+
     if ( cardOverlayVariantSelect ) {
-      cardOverlayVariantSelect.disabled = false;
+      cardOverlayVariantSelect.disabled = ! shouldShowVariantSelect;
       cardOverlayVariantSelect.innerHTML = '';
+
+      if ( shouldShowVariantSelect ) {
+        entries.forEach( ( entry, index ) => {
+          const option = document.createElement( 'option' );
+          option.value = String( index );
+          option.textContent = getEntryOptionLabel( entry, index );
+          option.disabled = ! isEntryPurchasable( entry );
+          cardOverlayVariantSelect.appendChild( option );
+        } );
+      }
     }
 
-    if ( entries.length > 1 && cardOverlayVariantContainer && cardOverlayVariantSelect ) {
-      entries.forEach( ( entry, index ) => {
-        const option = document.createElement( 'option' );
-        option.value = String( index );
-        option.textContent = getEntryOptionLabel( entry, index );
-        option.disabled = ! isEntryPurchasable( entry );
-        cardOverlayVariantSelect.appendChild( option );
-      } );
-
-      cardOverlayVariantContainer.hidden = false;
-    } else if ( cardOverlayVariantContainer ) {
-      cardOverlayVariantContainer.hidden = true;
+    if ( cardOverlayVariantContainer ) {
+      cardOverlayVariantContainer.hidden = ! shouldShowVariantSelect;
     }
 
     let defaultIndex = entries.findIndex( ( entry ) => isEntryPurchasable( entry ) );
@@ -1527,8 +2531,23 @@ CSS;
     showCommerceMessage( '', '' );
 
     const endpoint = getAddToCartEndpoint();
-    const payload = buildAddToCartPayload( entry );
+    const quantity = getSelectedQuantityValue();
+    const payload = buildAddToCartPayload( entry, {
+      includeAddToCartParam: shouldIncludeAddToCartParam( endpoint ),
+    }, quantity );
     let responseData = null;
+
+    try {
+      console.log( '[Kiosk AddToCart] Endpoint:', endpoint );
+
+      if ( payload instanceof URLSearchParams ) {
+        console.log( '[Kiosk AddToCart] Payload:', payload.toString() );
+      } else {
+        console.log( '[Kiosk AddToCart] Payload:', payload );
+      }
+    } catch ( logError ) {
+      console.log( '[Kiosk AddToCart] Payload log error:', logError );
+    }
 
     try {
       const response = await fetch( endpoint, {
@@ -1547,13 +2566,20 @@ CSS;
 
       responseData = await response.json().catch( () => null );
 
-      if ( responseData && responseData.error ) {
-        if ( responseData.product_url ) {
-          window.location.href = responseData.product_url;
+      if ( responseData && ( responseData.error || responseData.success === false ) ) {
+        const message = extractErrorMessage( responseData );
+
+        if ( message ) {
+          showCommerceMessage( message, 'error' );
           return;
         }
 
-        throw new Error( 'Add to cart error' );
+        showCommerceMessage(
+          ( 'undefined' !== typeof i18n && i18n.addToCartError ) ||
+            'Unable to add this item to your cart.',
+          'error'
+        );
+        return;
       }
 
       showCommerceMessage( formatAddedMessage( entry ), 'success' );
@@ -1581,11 +2607,55 @@ CSS;
       }
     } catch ( error ) {
       console.error( error );
-      showCommerceMessage( i18n.addToCartError || 'Unable to add this item to your cart.', 'error' );
+
+      if ( ! responseData || ! responseData.error ) {
+        showCommerceMessage(
+          ( 'undefined' !== typeof i18n && i18n.addToCartError ) ||
+            'Unable to add this item to your cart.',
+          'error'
+        );
+      }
     } finally {
       updateAddToCartLoading( false );
       updateAddToCartButtonState( currentCommerceEntries[ currentCommerceSelectionIndex ] || null );
     }
+  }
+
+  function extractErrorMessage( response ) {
+    if ( ! response ) {
+      return '';
+    }
+
+    if ( response.messages && 'string' === typeof response.messages ) {
+      const text = response.messages
+        .replace( /<style[\s\S]*?<\/style>/gi, ' ' )
+        .replace( /<script[\s\S]*?<\/script>/gi, ' ' )
+        .replace( /<[^>]+>/g, ' ' )
+        .replace( /\s+/g, ' ' )
+        .trim();
+
+      if ( text ) {
+        return text;
+      }
+    }
+
+    if ( response.data && 'string' === typeof response.data.message ) {
+      const nestedMessage = response.data.message.trim();
+
+      if ( nestedMessage ) {
+        return nestedMessage;
+      }
+    }
+
+    if ( 'string' === typeof response.message ) {
+      const flatMessage = response.message.trim();
+
+      if ( flatMessage ) {
+        return flatMessage;
+      }
+    }
+
+    return '';
   }
 
   function openCardOverlay( card, triggerElement ) {
@@ -1847,9 +2917,31 @@ CSS;
       cards = cards.filter( ( card ) => cardMatchesSelectedType( card, selectedGroup ) );
     }
 
+    if ( selectedRarityValue ) {
+      cards = cards.filter( ( card ) => cardMatchesSelectedRarity( card ) );
+    }
+
     if ( searchTerm ) {
       cards = cards.filter( ( card ) => card.name.toLowerCase().includes( searchTerm ) );
     }
+
+    cards = cards.filter( ( card ) => {
+      if ( ! card || 'object' !== typeof card ) {
+        return false;
+      }
+
+      if ( ! Array.isArray( card.products ) || ! card.products.length ) {
+        return true;
+      }
+
+      const entries = normalizeProductEntries( card.products );
+
+      if ( ! entries.length ) {
+        return true;
+      }
+
+      return entries.some( ( entry ) => isEntryInStockForDisplay( entry ) );
+    } );
 
     return cards;
   }
@@ -1874,9 +2966,15 @@ CSS;
     }
 
     selected.cards.forEach( ( card ) => {
-      if ( card.set ) {
-        sets.add( card.set );
+      if ( ! card || ! card.set ) {
+        return;
       }
+
+      if ( ! cardHasInStockProducts( card ) ) {
+        return;
+      }
+
+      sets.add( card.set );
     } );
 
     const availableSets = Array.from( sets );
@@ -2185,6 +3283,130 @@ CSS;
     typeFilterWrapper.hidden = false;
   }
 
+  function normalizeRarityValue( value ) {
+    if ( 'string' !== typeof value ) {
+      return '';
+    }
+
+    const cleaned = value.trim();
+
+    if ( ! cleaned ) {
+      return '';
+    }
+
+    return cleaned.toLowerCase();
+  }
+
+  function isOnePieceGame( slug ) {
+    if ( ! slug ) {
+      return false;
+    }
+
+    const normalized = String( slug ).toLowerCase();
+
+    return normalized.includes( 'one-piece' ) || normalized.includes( 'onepiece' );
+  }
+
+  function updateActiveRarityButton() {
+    const buttons = rarityOptionsContainer.querySelectorAll( '.tcg-kiosk__rarity-button' );
+
+    buttons.forEach( ( button ) => {
+      const value = button.dataset.value || '';
+      const isActive = value ? value === selectedRarityValue : selectedRarityValue === '';
+      button.classList.toggle( 'is-active', isActive );
+      button.setAttribute( 'aria-pressed', isActive ? 'true' : 'false' );
+    } );
+  }
+
+  function createRarityButton( value, label ) {
+    const button = document.createElement( 'button' );
+    button.type = 'button';
+    button.className = 'tcg-kiosk__rarity-button';
+    button.dataset.value = value;
+    button.textContent = label;
+    button.setAttribute( 'aria-pressed', 'false' );
+
+    button.addEventListener( 'click', () => {
+      if ( value && selectedRarityValue === value ) {
+        selectedRarityValue = '';
+      } else {
+        selectedRarityValue = value;
+      }
+
+      hasInteracted = true;
+      currentPage = 1;
+      updateActiveRarityButton();
+      renderCards();
+    } );
+
+    return button;
+  }
+
+  function cardMatchesSelectedRarity( card ) {
+    if ( ! card || 'object' !== typeof card ) {
+      return false;
+    }
+
+    const selection = normalizeRarityValue( selectedRarityValue );
+
+    if ( ! selection ) {
+      return false;
+    }
+
+    const rarity = normalizeRarityValue( card.rarity );
+
+    if ( ! rarity ) {
+      return false;
+    }
+
+    return rarity === selection;
+  }
+
+  function updateRarityOptions() {
+    selectedRarityValue = '';
+    rarityOptionsContainer.innerHTML = '';
+    rarityFilterWrapper.hidden = true;
+    rarityFilterWrapper.setAttribute( 'hidden', '' );
+
+    const typeValue = gameSelect.value;
+
+    if ( ! typeValue || ! isOnePieceGame( typeValue ) ) {
+      return;
+    }
+
+    const selected = data.find( ( group ) => group.slug === typeValue );
+
+    if ( ! selected ) {
+      return;
+    }
+
+    const rarityValues = new Set();
+
+    selected.cards.forEach( ( card ) => {
+      if ( card && card.rarity ) {
+        rarityValues.add( card.rarity );
+      }
+    } );
+
+    if ( ! rarityValues.size ) {
+      return;
+    }
+
+    const options = Array.from( rarityValues )
+      .filter( Boolean )
+      .sort( ( a, b ) => String( a ).localeCompare( String( b ) ) );
+
+    rarityOptionsContainer.appendChild( createRarityButton( '', i18n.allRarities || 'All Rarities' ) );
+
+    options.forEach( ( rarity ) => {
+      rarityOptionsContainer.appendChild( createRarityButton( rarity, rarity ) );
+    } );
+
+    updateActiveRarityButton();
+    rarityFilterWrapper.hidden = false;
+    rarityFilterWrapper.removeAttribute( 'hidden' );
+  }
+
   function buildProxiedSrcset( srcset ) {
     if ( 'string' !== typeof srcset || ! srcset.trim() ) {
       return '';
@@ -2222,19 +3444,213 @@ CSS;
     return '';
   }
 
-  function renderCards() {
+  function getEntryNumericPrice( entry ) {
+    if ( ! entry || 'object' !== typeof entry ) {
+      return null;
+    }
+
+    const candidates = [ entry.price, entry.salePrice, entry.regularPrice ];
+
+    for ( const candidate of candidates ) {
+      if ( 'number' === typeof candidate && Number.isFinite( candidate ) ) {
+        return candidate;
+      }
+
+      if ( 'string' === typeof candidate ) {
+        const normalized = candidate.replace( /,/g, '' ).trim();
+
+        if ( ! normalized ) {
+          continue;
+        }
+
+        const parsed = Number.parseFloat( normalized );
+
+        if ( Number.isFinite( parsed ) ) {
+          return parsed;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  let currencySymbolDecoder = null;
+
+  function decodeCurrencySymbol( rawSymbol ) {
+    if ( 'string' !== typeof rawSymbol ) {
+      return '';
+    }
+
+    const trimmed = rawSymbol.trim();
+
+    if ( ! trimmed ) {
+      return '';
+    }
+
+    if ( trimmed.indexOf( '&' ) === -1 ) {
+      return trimmed;
+    }
+
+    if ( ! currencySymbolDecoder ) {
+      currencySymbolDecoder = document.createElement( 'div' );
+    }
+
+    currencySymbolDecoder.innerHTML = trimmed;
+
+    const decoded = ( currencySymbolDecoder.textContent || '' ).trim();
+
+    currencySymbolDecoder.textContent = '';
+
+    return decoded || trimmed;
+  }
+
+  function formatPriceAmount( amount, currencySymbol ) {
+    if ( 'number' !== typeof amount || ! Number.isFinite( amount ) ) {
+      return '';
+    }
+
+    const hasFraction = Math.abs( amount - Math.trunc( amount ) ) > 0.0001;
+    const fractionDigits = hasFraction ? 2 : 0;
+    let formatted = '';
+
+    try {
+      formatted = amount.toLocaleString( undefined, {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+      } );
+    } catch ( error ) {
+      formatted = amount.toFixed( fractionDigits );
+    }
+
+    const resolvedSymbol = decodeCurrencySymbol( currencySymbol ) || '$';
+
+    return `${ resolvedSymbol }${ formatted }`;
+  }
+
+  function getCardPriceSummary( card ) {
+    if ( ! card || ! Array.isArray( card.products ) || ! card.products.length ) {
+      return '';
+    }
+
+    const entries = normalizeProductEntries( card.products );
+    const prices = [];
+    let currencySymbol = '';
+
+    entries.forEach( ( entry ) => {
+      if ( entry && ! currencySymbol && entry.currencySymbol ) {
+        currencySymbol = String( entry.currencySymbol );
+      }
+
+      const numericPrice = getEntryNumericPrice( entry );
+
+      if ( 'number' === typeof numericPrice ) {
+        prices.push( numericPrice );
+      }
+    } );
+
+    if ( ! prices.length ) {
+      return '';
+    }
+
+    prices.sort( ( a, b ) => a - b );
+    const min = prices[ 0 ];
+    const max = prices[ prices.length - 1 ];
+    const formattedMin = formatPriceAmount( min, currencySymbol );
+    const formattedMax = formatPriceAmount( max, currencySymbol );
+
+    if ( ! formattedMin || ! formattedMax ) {
+      return '';
+    }
+
+    const samePrice = Math.abs( max - min ) < 0.00001;
+
+    return samePrice ? formattedMin : `${ formattedMin } - ${ formattedMax }`;
+  }
+
+  function createCardPriceBadge( card ) {
+    const summary = getCardPriceSummary( card );
+
+    if ( ! summary ) {
+      return null;
+    }
+
+    const badge = document.createElement( 'span' );
+    badge.className = 'tcg-kiosk__card-price';
+    badge.textContent = summary;
+
+    return badge;
+  }
+
+  function adjustCardPriceBadgePosition( badge ) {
+    if ( ! badge ) {
+      return;
+    }
+
+    const card = badge.closest( '.tcg-kiosk__card' );
+
+    if ( ! card ) {
+      return;
+    }
+
+    const image = card.querySelector( 'img' );
+
+    if ( ! image ) {
+      return;
+    }
+
+    const cardRect = card.getBoundingClientRect();
+    const imageRect = image.getBoundingClientRect();
+
+    if ( ! cardRect.width || ! imageRect.width || ! imageRect.height ) {
+      return;
+    }
+
+    const horizontalGap = Math.max( 0, ( cardRect.width - imageRect.width ) / 2 );
+    const verticalGap = Math.max( 0, ( cardRect.height - imageRect.height ) / 2 );
+    const verticalCenter = verticalGap + ( imageRect.height / 2 );
+
+    badge.style.right = `${ horizontalGap + 8 }px`;
+    badge.style.top = `${ verticalCenter }px`;
+    badge.style.transform = 'translateY(-50%)';
+  }
+
+  function updateCardPriceBadgePositions() {
+    if ( ! resultsContainer ) {
+      return;
+    }
+
+    const badges = resultsContainer.querySelectorAll( '.tcg-kiosk__card-price' );
+
+    badges.forEach( ( badge ) => adjustCardPriceBadgePosition( badge ) );
+  }
+
+  function scheduleCardPriceBadgeUpdate() {
+    if ( pendingPriceBadgeAnimationFrame ) {
+      window.cancelAnimationFrame( pendingPriceBadgeAnimationFrame );
+    }
+
+    pendingPriceBadgeAnimationFrame = window.requestAnimationFrame( () => {
+      pendingPriceBadgeAnimationFrame = null;
+      updateCardPriceBadgePositions();
+    } );
+  }
+
+  function renderCards( appendMobile = false ) {
     applyPageSizeLayout();
 
-    closeCardOverlay( { restoreFocus: false } );
+    if ( ! appendMobile ) {
+      closeCardOverlay( { restoreFocus: false } );
+    }
 
     if ( ! hasInteracted ) {
       resultsContainer.innerHTML = '';
+      detachMobileScrollListener();
       renderPagination( 0 );
       return;
     }
 
     const cards = getFilteredCards();
-
+    filteredCardsCache = cards.slice();
     const totalPages = Math.ceil( cards.length / cardsPerPage );
 
     if ( totalPages === 0 ) {
@@ -2243,13 +3659,16 @@ CSS;
       currentPage = totalPages;
     }
 
-    resultsContainer.innerHTML = '';
+    if ( ! appendMobile ) {
+      resultsContainer.innerHTML = '';
+    }
 
     if ( ! cards.length ) {
       const emptyState = document.createElement( 'p' );
       emptyState.className = 'tcg-kiosk__empty';
       emptyState.textContent = i18n.noCards || 'No cards match your filters.';
       resultsContainer.appendChild( emptyState );
+      detachMobileScrollListener();
       renderPagination( 0 );
       return;
     }
@@ -2262,6 +3681,7 @@ CSS;
     pageCards.forEach( ( card, index ) => {
       const item = document.createElement( 'article' );
       item.className = 'tcg-kiosk__card';
+      item.classList.add( 'tcg-kiosk__card--loading' );
 
       attachCardOverlayHandlers( item, card );
 
@@ -2297,14 +3717,53 @@ CSS;
       if ( 0 === startIndex && index < 2 ) {
         img.fetchPriority = 'high';
       }
-      img.addEventListener( 'error', () => handleImageError( img, card ) );
+      const handleImageResolved = () => {
+        item.classList.remove( 'tcg-kiosk__card--loading' );
+      };
+
+      if ( img.complete && img.naturalWidth > 0 ) {
+        handleImageResolved();
+      }
+
+      img.addEventListener( 'load', handleImageResolved );
+      img.addEventListener( 'error', () => {
+        handleImageError( img, card );
+        handleImageResolved();
+      } );
       item.appendChild( img );
+
+      const priceBadge = createCardPriceBadge( card );
+
+      if ( priceBadge ) {
+        item.appendChild( priceBadge );
+        const handleBadgePositionUpdate = () => scheduleCardPriceBadgeUpdate();
+
+        if ( img.complete ) {
+          handleBadgePositionUpdate();
+        }
+
+        img.addEventListener( 'load', handleBadgePositionUpdate );
+        img.addEventListener( 'error', handleBadgePositionUpdate );
+      }
 
       fragment.appendChild( item );
     } );
 
     resultsContainer.appendChild( fragment );
+    scheduleCardPriceBadgeUpdate();
     renderPagination( totalPages );
+
+    if ( mobilePageQuery.matches ) {
+      if ( totalPages > currentPage ) {
+        attachMobileScrollListener();
+      } else {
+        detachMobileScrollListener();
+      }
+    } else {
+      detachMobileScrollListener();
+    }
+
+    maybeAutoAppendForShortScreens( totalPages );
   }
 
   function handleImageError( img, card ) {
@@ -2396,6 +3855,49 @@ CSS;
     const statusTemplate = i18n.pageStatus || 'Page %1$s of %2$s';
     status.textContent = statusTemplate.replace( '%1$s', currentPage ).replace( '%2$s', totalPages );
 
+    const pageJumpLabel = document.createElement( 'label' );
+    pageJumpLabel.className = 'tcg-kiosk__page-jump';
+    pageJumpLabel.setAttribute( 'aria-label', i18n.pageLabel || 'Go to page' );
+
+    const pageJumpPrefix = document.createElement( 'span' );
+    pageJumpPrefix.textContent = ( i18n.pagePrefix || 'Page' ) + ':';
+    pageJumpLabel.appendChild( pageJumpPrefix );
+
+    const pageJumpInput = document.createElement( 'input' );
+    pageJumpInput.type = 'number';
+    pageJumpInput.min = '1';
+    pageJumpInput.max = String( totalPages );
+    pageJumpInput.value = String( currentPage );
+    pageJumpInput.inputMode = 'numeric';
+    pageJumpInput.pattern = '[0-9]*';
+
+    const handlePageJump = () => {
+      const desired = parseInt( pageJumpInput.value, 10 );
+
+      if ( Number.isInteger( desired ) && desired >= 1 && desired <= totalPages ) {
+        if ( desired !== currentPage ) {
+          currentPage = desired;
+          renderCards();
+          return;
+        }
+      }
+
+      pageJumpInput.value = String( currentPage );
+    };
+
+    pageJumpInput.addEventListener( 'change', handlePageJump );
+    pageJumpInput.addEventListener( 'keydown', ( event ) => {
+      if ( event.key === 'Enter' ) {
+        handlePageJump();
+      }
+    } );
+
+    pageJumpLabel.appendChild( pageJumpInput );
+
+    const pageJumpSuffix = document.createElement( 'span' );
+    pageJumpSuffix.textContent = ( i18n.pageSeparator || 'of' ) + ` ${ totalPages }`;
+    pageJumpLabel.appendChild( pageJumpSuffix );
+
     const nextButton = document.createElement( 'button' );
     nextButton.type = 'button';
     nextButton.className = 'tcg-kiosk__page-button';
@@ -2410,8 +3912,11 @@ CSS;
 
     paginationContainer.appendChild( prevButton );
     paginationContainer.appendChild( status );
+    paginationContainer.appendChild( pageJumpLabel );
     paginationContainer.appendChild( nextButton );
   }
+
+  window.addEventListener( 'resize', scheduleCardPriceBadgeUpdate );
 
   if ( cardOverlay ) {
     cardOverlay.addEventListener( 'click', ( event ) => {
@@ -2437,6 +3942,15 @@ CSS;
     } );
   }
 
+  if ( cardOverlayQuantityInput ) {
+    cardOverlayQuantityInput.addEventListener( 'input', () => {
+      const entry = currentCommerceEntries[ currentCommerceSelectionIndex ] || null;
+      const quantity = clampQuantityForEntry( cardOverlayQuantityInput.value, entry );
+      currentQuantityValue = quantity;
+      cardOverlayQuantityInput.value = String( quantity );
+    } );
+  }
+
   if ( cardOverlayAddToCart ) {
     cardOverlayAddToCart.addEventListener( 'click', ( event ) => {
       event.preventDefault();
@@ -2449,6 +3963,7 @@ CSS;
     currentPage = 1;
     updateSetOptions();
     updateTypeOptions();
+    updateRarityOptions();
     renderCards();
   } );
 
@@ -2468,13 +3983,24 @@ CSS;
     const requested = parseInt( pageSizeSelect.value, 10 );
 
     if ( Number.isInteger( requested ) ) {
-      cardsPerPage = requested;
+      if ( mobilePageQuery.matches ) {
+        desktopPageSize = requested;
+      } else {
+        cardsPerPage = requested;
+        desktopPageSize = requested;
+      }
       applyPageSizeLayout();
       hasInteracted = true;
       currentPage = 1;
       renderCards();
     }
   } );
+
+  if ( mobilePageQuery && typeof mobilePageQuery.addEventListener === 'function' ) {
+    mobilePageQuery.addEventListener( 'change', handleMobilePageSizeChange );
+  } else if ( mobilePageQuery && typeof mobilePageQuery.addListener === 'function' ) {
+    mobilePageQuery.addListener( handleMobilePageSizeChange );
+  }
 
   const placeholders = i18n;
   if ( setSelect.dataset ) {
@@ -2492,6 +4018,7 @@ CSS;
   populateOverlayOptions();
   updateSetOptions();
   updateTypeOptions();
+  updateRarityOptions();
   applyPageSizeLayout();
   renderPagination( 0 );
   if ( gameSelect.value ) {
@@ -2530,9 +4057,15 @@ JS;
                         <dl id="tcg-kiosk-detail-metadata" class="tcg-kiosk__card-overlay-details"></dl>
                         <div id="tcg-kiosk-card-overlay-commerce" class="tcg-kiosk__card-overlay-commerce" hidden>
                             <div id="tcg-kiosk-card-overlay-price" class="tcg-kiosk__card-overlay-price"></div>
-                            <div id="tcg-kiosk-card-overlay-variant" class="tcg-kiosk__card-overlay-variant" hidden>
-                                <label for="tcg-kiosk-card-overlay-variant-select" id="tcg-kiosk-card-overlay-variant-label" class="tcg-kiosk__card-overlay-variant-label"><?php esc_html_e( 'Choose a version', 'tcg-kiosk-filter' ); ?></label>
-                                <select id="tcg-kiosk-card-overlay-variant-select" class="tcg-kiosk__card-overlay-variant-select"></select>
+                            <div class="tcg-kiosk__card-overlay-selection">
+                                <div id="tcg-kiosk-card-overlay-variant" class="tcg-kiosk__card-overlay-variant" hidden>
+                                    <label for="tcg-kiosk-card-overlay-variant-select" id="tcg-kiosk-card-overlay-variant-label" class="tcg-kiosk__card-overlay-variant-label"><?php esc_html_e( 'Choose a version', 'tcg-kiosk-filter' ); ?></label>
+                                    <select id="tcg-kiosk-card-overlay-variant-select" class="tcg-kiosk__card-overlay-variant-select"></select>
+                                </div>
+                                <div id="tcg-kiosk-card-overlay-quantity" class="tcg-kiosk__card-overlay-quantity" hidden>
+                                    <label for="tcg-kiosk-card-overlay-quantity-input" class="tcg-kiosk__card-overlay-quantity-label"><?php esc_html_e( 'Amount', 'tcg-kiosk-filter' ); ?></label>
+                                    <input type="number" id="tcg-kiosk-card-overlay-quantity-input" class="tcg-kiosk__card-overlay-quantity-input" value="1" min="1" step="1" inputmode="numeric" pattern="[0-9]*" />
+                                </div>
                             </div>
                             <button type="button" id="tcg-kiosk-card-overlay-add-to-cart" class="tcg-kiosk__card-overlay-add-to-cart" disabled><?php esc_html_e( 'Add to cart', 'tcg-kiosk-filter' ); ?></button>
                             <p id="tcg-kiosk-card-overlay-commerce-message" class="tcg-kiosk__card-overlay-commerce-message" role="status" aria-live="polite" hidden></p>
@@ -2557,23 +4090,30 @@ JS;
                     <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
                 </div>
                 <div class="tcg-kiosk__actions">
-                    <div class="tcg-kiosk__search" role="search">
-                        <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
-                        <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
+                    <div class="tcg-kiosk__actions-row">
+                        <label class="tcg-kiosk__page-size" for="tcg-kiosk-page-size">
+                            <span><?php esc_html_e( 'Cards per page', 'tcg-kiosk-filter' ); ?></span>
+                            <select id="tcg-kiosk-page-size" class="tcg-kiosk__select">
+                                <option value="4">4</option>
+                                <option value="10" selected>10</option>
+                                <option value="12">12</option>
+                                <option value="16">16</option>
+                                <option value="20">20</option>
+                            </select>
+                        </label>
+                        <div id="tcg-kiosk-rarity-filter" class="tcg-kiosk__rarity-filter" role="group" aria-label="<?php esc_attr_e( 'Rarity', 'tcg-kiosk-filter' ); ?>" hidden>
+                            <span class="tcg-kiosk__rarity-label"><?php esc_html_e( 'Rarity', 'tcg-kiosk-filter' ); ?></span>
+                            <div id="tcg-kiosk-rarity-options" class="tcg-kiosk__rarity-options" role="presentation"></div>
+                        </div>
+                        <div class="tcg-kiosk__search" role="search">
+                            <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
+                            <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
+                        </div>
                     </div>
-                    <label class="tcg-kiosk__page-size" for="tcg-kiosk-page-size">
-                        <span><?php esc_html_e( 'Cards per page', 'tcg-kiosk-filter' ); ?></span>
-                        <select id="tcg-kiosk-page-size" class="tcg-kiosk__select">
-                            <option value="10" selected>10</option>
-                            <option value="12">12</option>
-                            <option value="16">16</option>
-                            <option value="20">20</option>
-                        </select>
-                    </label>
+                    <nav id="tcg-kiosk-pagination" class="tcg-kiosk__pagination" aria-label="<?php esc_attr_e( 'Card results pagination', 'tcg-kiosk-filter' ); ?>" hidden></nav>
                 </div>
             </header>
             <div id="tcg-kiosk-results" class="tcg-kiosk__grid" aria-live="polite"></div>
-            <nav id="tcg-kiosk-pagination" class="tcg-kiosk__pagination" aria-label="<?php esc_attr_e( 'Card results pagination', 'tcg-kiosk-filter' ); ?>" hidden></nav>
         </div>
         <?php
         return ob_get_clean();
