@@ -226,6 +226,7 @@ header {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    min-width: 180px;
 }
 
 .tcg-kiosk__rarity-filter[hidden] {
@@ -238,27 +239,13 @@ header {
     color: #1d2327;
 }
 
-.tcg-kiosk__rarity-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.tcg-kiosk__rarity-button {
+.tcg-kiosk__rarity-select {
     border: 1px solid #c3c4c7;
     background: #fff;
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.95rem;
     color: #1d2327;
-    border-radius: 999px;
-    padding: 0.3rem 0.85rem;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-
-.tcg-kiosk__rarity-button.is-active {
-    background: #1d2327;
-    color: #fff;
-    border-color: #1d2327;
 }
 
 .tcg-kiosk__type-options {
@@ -1100,7 +1087,7 @@ CSS;
   const typeFilterWrapper = document.getElementById( 'tcg-kiosk-type-filter' );
   const typeOptionsContainer = document.getElementById( 'tcg-kiosk-type-options' );
   const rarityFilterWrapper = document.getElementById( 'tcg-kiosk-rarity-filter' );
-  const rarityOptionsContainer = document.getElementById( 'tcg-kiosk-rarity-options' );
+  const raritySelect = document.getElementById( 'tcg-kiosk-rarity-select' );
   const searchInput = document.getElementById( 'tcg-kiosk-search' );
   const pageSizeSelect = document.getElementById( 'tcg-kiosk-page-size' );
   const pageSizeLabel = document.querySelector( 'label[for="tcg-kiosk-page-size"] span' );
@@ -1164,7 +1151,7 @@ CSS;
     [ 'yellow', '#1d2327' ],
   ] );
 
-  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! rarityFilterWrapper || ! rarityOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
+  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! rarityFilterWrapper || ! raritySelect || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
   }
 
@@ -3307,41 +3294,6 @@ CSS;
     return normalized.includes( 'one-piece' ) || normalized.includes( 'onepiece' );
   }
 
-  function updateActiveRarityButton() {
-    const buttons = rarityOptionsContainer.querySelectorAll( '.tcg-kiosk__rarity-button' );
-
-    buttons.forEach( ( button ) => {
-      const value = button.dataset.value || '';
-      const isActive = value ? value === selectedRarityValue : selectedRarityValue === '';
-      button.classList.toggle( 'is-active', isActive );
-      button.setAttribute( 'aria-pressed', isActive ? 'true' : 'false' );
-    } );
-  }
-
-  function createRarityButton( value, label ) {
-    const button = document.createElement( 'button' );
-    button.type = 'button';
-    button.className = 'tcg-kiosk__rarity-button';
-    button.dataset.value = value;
-    button.textContent = label;
-    button.setAttribute( 'aria-pressed', 'false' );
-
-    button.addEventListener( 'click', () => {
-      if ( value && selectedRarityValue === value ) {
-        selectedRarityValue = '';
-      } else {
-        selectedRarityValue = value;
-      }
-
-      hasInteracted = true;
-      currentPage = 1;
-      updateActiveRarityButton();
-      renderCards();
-    } );
-
-    return button;
-  }
-
   function cardMatchesSelectedRarity( card ) {
     if ( ! card || 'object' !== typeof card ) {
       return false;
@@ -3364,7 +3316,7 @@ CSS;
 
   function updateRarityOptions() {
     selectedRarityValue = '';
-    rarityOptionsContainer.innerHTML = '';
+    raritySelect.innerHTML = '';
     rarityFilterWrapper.hidden = true;
     rarityFilterWrapper.setAttribute( 'hidden', '' );
 
@@ -3396,13 +3348,13 @@ CSS;
       .filter( Boolean )
       .sort( ( a, b ) => String( a ).localeCompare( String( b ) ) );
 
-    rarityOptionsContainer.appendChild( createRarityButton( '', i18n.allRarities || 'All Rarities' ) );
+    raritySelect.appendChild( createOption( '', i18n.allRarities || 'All Rarities' ) );
 
     options.forEach( ( rarity ) => {
-      rarityOptionsContainer.appendChild( createRarityButton( rarity, rarity ) );
+      raritySelect.appendChild( createOption( rarity, rarity ) );
     } );
 
-    updateActiveRarityButton();
+    raritySelect.value = '';
     rarityFilterWrapper.hidden = false;
     rarityFilterWrapper.removeAttribute( 'hidden' );
   }
@@ -3979,6 +3931,13 @@ CSS;
     renderCards();
   } );
 
+  raritySelect.addEventListener( 'change', () => {
+    selectedRarityValue = raritySelect.value || '';
+    hasInteracted = true;
+    currentPage = 1;
+    renderCards();
+  } );
+
   pageSizeSelect.addEventListener( 'change', () => {
     const requested = parseInt( pageSizeSelect.value, 10 );
 
@@ -4086,8 +4045,14 @@ JS;
                         </select>
                     </label>
                 </div>
-                <div id="tcg-kiosk-type-filter" class="tcg-kiosk__type-filter" role="group" aria-label="<?php esc_attr_e( 'Type', 'tcg-kiosk-filter' ); ?>" data-default-label="<?php echo esc_attr__( 'Type', 'tcg-kiosk-filter' ); ?>" hidden>
-                    <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
+                <div class="tcg-kiosk__type-and-rarity">
+                    <div id="tcg-kiosk-type-filter" class="tcg-kiosk__type-filter" role="group" aria-label="<?php esc_attr_e( 'Type', 'tcg-kiosk-filter' ); ?>" data-default-label="<?php echo esc_attr__( 'Type', 'tcg-kiosk-filter' ); ?>" hidden>
+                        <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
+                    </div>
+                    <div id="tcg-kiosk-rarity-filter" class="tcg-kiosk__rarity-filter" role="group" aria-label="<?php esc_attr_e( 'Rarity', 'tcg-kiosk-filter' ); ?>" hidden>
+                        <label class="tcg-kiosk__rarity-label" for="tcg-kiosk-rarity-select"><?php esc_html_e( 'Rarity', 'tcg-kiosk-filter' ); ?></label>
+                        <select id="tcg-kiosk-rarity-select" class="tcg-kiosk__rarity-select"></select>
+                    </div>
                 </div>
                 <div class="tcg-kiosk__actions">
                     <div class="tcg-kiosk__actions-row">
@@ -4101,10 +4066,6 @@ JS;
                                 <option value="20">20</option>
                             </select>
                         </label>
-                        <div id="tcg-kiosk-rarity-filter" class="tcg-kiosk__rarity-filter" role="group" aria-label="<?php esc_attr_e( 'Rarity', 'tcg-kiosk-filter' ); ?>" hidden>
-                            <span class="tcg-kiosk__rarity-label"><?php esc_html_e( 'Rarity', 'tcg-kiosk-filter' ); ?></span>
-                            <div id="tcg-kiosk-rarity-options" class="tcg-kiosk__rarity-options" role="presentation"></div>
-                        </div>
                         <div class="tcg-kiosk__search" role="search">
                             <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
                             <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
@@ -4237,3 +4198,19 @@ JS;
 }
 
 TCG_Kiosk_Filter_Plugin::instance();
+.tcg-kiosk__type-and-rarity {
+    flex: 1 1 60%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.tcg-kiosk__type-and-rarity .tcg-kiosk__type-filter {
+    flex: 1 1 360px;
+}
+
+.tcg-kiosk__type-and-rarity .tcg-kiosk__rarity-filter {
+    flex: 0 1 200px;
+    margin-top: 15px;
+}
