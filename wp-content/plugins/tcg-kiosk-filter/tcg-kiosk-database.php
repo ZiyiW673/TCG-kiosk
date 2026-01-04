@@ -176,6 +176,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $cards[] = array(
                         'id'           => isset( $card['id'] ) ? (string) $card['id'] : '',
                         'name'         => isset( $card['name'] ) ? (string) $card['name'] : '',
+                        'rarity'       => isset( $card['rarity'] ) ? (string) $card['rarity'] : '',
                         'game'         => $game,
                         'set'          => $set_name,
                         'imageUrl'     => $image_sources['primary'],
@@ -261,6 +262,10 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
 
                 foreach ( $lookup[ $normalized ] as $entry ) {
                     if ( empty( $entry ) || ! is_array( $entry ) ) {
+                        continue;
+                    }
+
+                    if ( ! $this->entry_matches_game_category( $entry, $type_slug ) ) {
                         continue;
                     }
 
@@ -678,6 +683,8 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'stockQuantity'    => $product && null !== $product->get_stock_quantity() ? (int) $product->get_stock_quantity() : null,
                 'backordersAllowed'=> $product ? (bool) $product->backorders_allowed() : false,
                 'permalink'        => $this->sanitize_url_value( $product ? $product->get_permalink() : '' ),
+                'productCategories'=> $this->get_product_category_slugs( $product_id, $product ),
+                'productCategoryNames' => $this->get_product_category_names( $product_id, $product ),
                 'attributes'       => array(),
                 'attributeSummary' => '',
             );
@@ -712,6 +719,8 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'stockQuantity'    => null,
                 'backordersAllowed'=> false,
                 'permalink'        => $this->sanitize_url_value( $permalink ),
+                'productCategories'=> $this->get_product_category_slugs( $product_id ),
+                'productCategoryNames' => $this->get_product_category_names( $product_id ),
                 'attributes'       => array(),
                 'attributeSummary' => '',
             );
@@ -767,6 +776,8 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'permalink'        => $this->sanitize_url_value(
                     $variation ? $variation->get_permalink() : ( $parent_product ? $parent_product->get_permalink() : '' )
                 ),
+                'productCategories'=> $this->get_product_category_slugs( $parent_id, $parent_product ),
+                'productCategoryNames' => $this->get_product_category_names( $parent_id, $parent_product ),
                 'attributes'       => $variation ? $this->prepare_variation_attributes( $variation->get_attributes() ) : array(),
                 'attributeSummary' => $attribute_summary,
             );
@@ -801,9 +812,208 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                 'stockQuantity'    => null,
                 'backordersAllowed'=> false,
                 'permalink'        => $this->sanitize_url_value( $parent_product ? $parent_product->get_permalink() : '' ),
+                'productCategories'=> $this->get_product_category_slugs( $parent_id, $parent_product ),
+                'productCategoryNames' => $this->get_product_category_names( $parent_id, $parent_product ),
                 'attributes'       => array(),
                 'attributeSummary' => '',
             );
+        }
+
+        /**
+         * Retrieve normalized product category slugs for a product.
+         *
+         * @param int        $product_id Product ID.
+         * @param WC_Product $product    Optional product instance.
+         *
+         * @return array
+         */
+        protected function get_product_category_slugs( $product_id, $product = null ) {
+            $terms = $this->get_product_category_terms( $product_id, $product );
+
+            if ( empty( $terms ) ) {
+                return array();
+            }
+
+            $slugs = array();
+
+            foreach ( $terms as $term ) {
+                if ( ! $term || empty( $term->slug ) ) {
+                    continue;
+                }
+
+                $slug = sanitize_title( $term->slug );
+
+                if ( '' !== $slug ) {
+                    $slugs[] = $slug;
+                }
+            }
+
+            return array_values( array_unique( $slugs ) );
+        }
+
+        /**
+         * Retrieve product category display names for a product.
+         *
+         * @param int        $product_id Product ID.
+         * @param WC_Product $product    Optional product instance.
+         *
+         * @return array
+         */
+        protected function get_product_category_names( $product_id, $product = null ) {
+            $terms = $this->get_product_category_terms( $product_id, $product );
+
+            if ( empty( $terms ) ) {
+                return array();
+            }
+
+            $names = array();
+
+            foreach ( $terms as $term ) {
+                if ( ! $term || empty( $term->name ) ) {
+                    continue;
+                }
+
+                $name = trim( (string) $term->name );
+
+                if ( '' !== $name ) {
+                    $names[] = $name;
+                }
+            }
+
+            return array_values( array_unique( $names ) );
+        }
+
+        /**
+         * Retrieve product category terms for a product.
+         *
+         * @param int        $product_id Product ID.
+         * @param WC_Product $product    Optional product instance.
+         *
+         * @return array
+         */
+        protected function get_product_category_terms( $product_id, $product = null ) {
+            $category_ids = array();
+
+            if ( $product && method_exists( $product, 'get_category_ids' ) ) {
+                $category_ids = $product->get_category_ids();
+            } elseif ( function_exists( 'wc_get_product' ) ) {
+                $loaded = wc_get_product( $product_id );
+
+                if ( $loaded && method_exists( $loaded, 'get_category_ids' ) ) {
+                    $category_ids = $loaded->get_category_ids();
+                }
+            }
+
+            if ( empty( $category_ids ) ) {
+                return array();
+            }
+
+            $terms = get_terms(
+                array(
+                    'taxonomy'   => 'product_cat',
+                    'include'    => array_map( 'absint', $category_ids ),
+                    'hide_empty' => false,
+                )
+            );
+
+            if ( empty( $terms ) || is_wp_error( $terms ) ) {
+                return array();
+            }
+
+            return $terms;
+        }
+
+        /**
+         * Retrieve expected category names for a given game slug.
+         *
+         * @param string $type_slug Game/type slug.
+         *
+         * @return array
+         */
+        protected function get_game_category_names( $type_slug ) {
+            $game_key = $this->normalize_game_key( $type_slug );
+
+            if ( '' === $game_key ) {
+                return array();
+            }
+
+            $map = array(
+                'one-piece' => array( 'One Piece TCG' ),
+                'gundam'    => array( 'Gundam TCG' ),
+                'riftbound' => array( 'Riftbound TCG' ),
+                'pokemon'   => array( 'Pokemon TCG' ),
+            );
+
+            return isset( $map[ $game_key ] ) ? $map[ $game_key ] : array();
+        }
+
+        /**
+         * Normalize a game key from a type slug.
+         *
+         * @param string $type_slug Game/type slug.
+         *
+         * @return string
+         */
+        protected function normalize_game_key( $type_slug ) {
+            $normalized = sanitize_title( $type_slug );
+
+            if ( '' === $normalized ) {
+                return '';
+            }
+
+            $known = array( 'one-piece', 'gundam', 'riftbound', 'pokemon' );
+
+            foreach ( $known as $key ) {
+                if ( false !== strpos( $normalized, $key ) || 'onepiece' === str_replace( '-', '', $normalized ) ) {
+                    return $key;
+                }
+            }
+
+            return $normalized;
+        }
+
+        /**
+         * Determine whether a product entry should match the current game slug.
+         *
+         * @param array  $entry     Product entry payload.
+         * @param string $type_slug Game/type slug.
+         *
+         * @return bool
+         */
+        protected function entry_matches_game_category( array $entry, $type_slug ) {
+            if ( ! $type_slug ) {
+                return true;
+            }
+
+            $normalized_type = $this->normalize_game_key( $type_slug );
+
+            if ( '' === $normalized_type ) {
+                return true;
+            }
+
+            $expected_names = $this->get_game_category_names( $type_slug );
+
+            if ( ! empty( $expected_names ) && ! empty( $entry['productCategoryNames'] ) && is_array( $entry['productCategoryNames'] ) ) {
+                $expected = array_map( 'sanitize_title', $expected_names );
+
+                foreach ( $entry['productCategoryNames'] as $category_name ) {
+                    if ( in_array( sanitize_title( $category_name ), $expected, true ) ) {
+                        return true;
+                    }
+                }
+            }
+
+            if ( empty( $entry['productCategories'] ) || ! is_array( $entry['productCategories'] ) ) {
+                return false;
+            }
+
+            foreach ( $entry['productCategories'] as $category_slug ) {
+                if ( $this->normalize_game_key( $category_slug ) === $normalized_type ) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /**
@@ -986,12 +1196,15 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
          */
         protected function get_card_identifier_candidates( array $card, $type_slug ) {
             $candidates = array();
+            $is_one_piece = false !== strpos( strtolower( (string) $type_slug ), 'one-piece' );
+            $raw_id = isset( $card['id'] ) ? (string) $card['id'] : '';
+            $is_one_piece_alt = $is_one_piece && $raw_id && preg_match( '/_p1$/i', $raw_id );
 
             if ( isset( $card['id'] ) ) {
                 $candidates[] = $card['id'];
             }
 
-            if ( isset( $card['number'] ) ) {
+            if ( ! $is_one_piece_alt && isset( $card['number'] ) ) {
                 $number = trim( (string) $card['number'] );
 
                 if ( '' !== $number ) {
@@ -1002,6 +1215,20 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                             if ( '' !== $set_id ) {
                                 $candidates[] = $set_id . '-' . $number;
                                 $candidates[] = $set_id . $number;
+
+                                if ( $is_one_piece ) {
+                                    $normalized_set = strtolower( $set_id );
+                                    $short_set = preg_replace( '/^op[-_]?/i', '', $normalized_set );
+                                    $short_set = $short_set ? $short_set : $normalized_set;
+
+                                    $candidates[] = 'op-' . $normalized_set . '-' . $number;
+                                    $candidates[] = 'op-' . $normalized_set . '-' . $number . '-' . $short_set;
+
+                                    if ( $short_set !== $normalized_set ) {
+                                        $candidates[] = 'op-' . $short_set . '-' . $number;
+                                        $candidates[] = 'op-' . $short_set . '-' . $number . '-' . $short_set;
+                                    }
+                                }
                             }
                         }
 
@@ -1012,6 +1239,43 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                                 $candidates[] = $ptcgo . '-' . $number;
                                 $candidates[] = $ptcgo . $number;
                             }
+                        }
+                    }
+                }
+            }
+
+            if ( $is_one_piece && '' !== $raw_id ) {
+                $base_id = preg_replace( '/_p\d+$/i', '', $raw_id );
+
+                if ( $base_id && preg_match( '/^([a-z]+[0-9]+)-?([0-9]+)$/i', $base_id, $matches ) ) {
+                    $set_code = strtolower( $matches[1] );
+                    $number = $matches[2];
+                    $number_trim = ltrim( $number, '0' );
+                    $number_trim = '' !== $number_trim ? $number_trim : $number;
+
+                    if ( $is_one_piece_alt ) {
+                        $candidates[] = $set_code . '-' . $number . '-p1';
+                        $candidates[] = $set_code . $number . 'p1';
+                        $candidates[] = 'op-' . $set_code . '-' . $number . '-p1';
+                        $candidates[] = 'op-' . $set_code . '-' . $number . '-' . $set_code . '-p1';
+
+                        if ( $number_trim !== $number ) {
+                            $candidates[] = $set_code . '-' . $number_trim . '-p1';
+                            $candidates[] = $set_code . $number_trim . 'p1';
+                            $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-p1';
+                            $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-' . $set_code . '-p1';
+                        }
+                    } else {
+                        $candidates[] = $set_code . '-' . $number;
+                        $candidates[] = $set_code . $number;
+                        $candidates[] = 'op-' . $set_code . '-' . $number;
+                        $candidates[] = 'op-' . $set_code . '-' . $number . '-' . $set_code;
+
+                        if ( $number_trim !== $number ) {
+                            $candidates[] = $set_code . '-' . $number_trim;
+                            $candidates[] = $set_code . $number_trim;
+                            $candidates[] = 'op-' . $set_code . '-' . $number_trim;
+                            $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-' . $set_code;
                         }
                     }
                 }
