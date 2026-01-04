@@ -4087,10 +4087,6 @@ JS;
                 <div id="tcg-kiosk-type-filter" class="tcg-kiosk__type-filter" role="group" aria-label="<?php esc_attr_e( 'Type', 'tcg-kiosk-filter' ); ?>" data-default-label="<?php echo esc_attr__( 'Type', 'tcg-kiosk-filter' ); ?>" hidden>
                     <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
                 </div>
-                <div id="tcg-kiosk-rarity-filter" class="tcg-kiosk__rarity-filter" role="group" aria-label="<?php esc_attr_e( 'Rarity', 'tcg-kiosk-filter' ); ?>" hidden>
-                    <span class="tcg-kiosk__rarity-label"><?php esc_html_e( 'Rarity', 'tcg-kiosk-filter' ); ?></span>
-                    <div id="tcg-kiosk-rarity-options" class="tcg-kiosk__rarity-options" role="presentation"></div>
-                </div>
                 <div class="tcg-kiosk__actions">
                     <div class="tcg-kiosk__actions-row">
                         <label class="tcg-kiosk__page-size" for="tcg-kiosk-page-size">
@@ -4103,6 +4099,10 @@ JS;
                                 <option value="20">20</option>
                             </select>
                         </label>
+                        <div id="tcg-kiosk-rarity-filter" class="tcg-kiosk__rarity-filter" role="group" aria-label="<?php esc_attr_e( 'Rarity', 'tcg-kiosk-filter' ); ?>" hidden>
+                            <span class="tcg-kiosk__rarity-label"><?php esc_html_e( 'Rarity', 'tcg-kiosk-filter' ); ?></span>
+                            <div id="tcg-kiosk-rarity-options" class="tcg-kiosk__rarity-options" role="presentation"></div>
+                        </div>
                         <div class="tcg-kiosk__search" role="search">
                             <label class="screen-reader-text" for="tcg-kiosk-search"><?php esc_html_e( 'Search by card name', 'tcg-kiosk-filter' ); ?></label>
                             <input type="search" id="tcg-kiosk-search" placeholder="<?php echo esc_attr__( 'Search cards…', 'tcg-kiosk-filter' ); ?>" />
