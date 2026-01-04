@@ -1197,12 +1197,13 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
             $candidates = array();
             $is_one_piece = false !== strpos( strtolower( (string) $type_slug ), 'one-piece' );
             $raw_id = isset( $card['id'] ) ? (string) $card['id'] : '';
+            $is_one_piece_alt = $is_one_piece && $raw_id && preg_match( '/_p1$/i', $raw_id );
 
             if ( isset( $card['id'] ) ) {
                 $candidates[] = $card['id'];
             }
 
-            if ( isset( $card['number'] ) ) {
+            if ( ! $is_one_piece_alt && isset( $card['number'] ) ) {
                 $number = trim( (string) $card['number'] );
 
                 if ( '' !== $number ) {
@@ -1251,16 +1252,30 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $number_trim = ltrim( $number, '0' );
                     $number_trim = '' !== $number_trim ? $number_trim : $number;
 
-                    $candidates[] = $set_code . '-' . $number;
-                    $candidates[] = $set_code . $number;
-                    $candidates[] = 'op-' . $set_code . '-' . $number;
-                    $candidates[] = 'op-' . $set_code . '-' . $number . '-' . $set_code;
+                    if ( $is_one_piece_alt ) {
+                        $candidates[] = $set_code . '-' . $number . '-p1';
+                        $candidates[] = $set_code . $number . 'p1';
+                        $candidates[] = 'op-' . $set_code . '-' . $number . '-p1';
+                        $candidates[] = 'op-' . $set_code . '-' . $number . '-' . $set_code . '-p1';
 
-                    if ( $number_trim !== $number ) {
-                        $candidates[] = $set_code . '-' . $number_trim;
-                        $candidates[] = $set_code . $number_trim;
-                        $candidates[] = 'op-' . $set_code . '-' . $number_trim;
-                        $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-' . $set_code;
+                        if ( $number_trim !== $number ) {
+                            $candidates[] = $set_code . '-' . $number_trim . '-p1';
+                            $candidates[] = $set_code . $number_trim . 'p1';
+                            $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-p1';
+                            $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-' . $set_code . '-p1';
+                        }
+                    } else {
+                        $candidates[] = $set_code . '-' . $number;
+                        $candidates[] = $set_code . $number;
+                        $candidates[] = 'op-' . $set_code . '-' . $number;
+                        $candidates[] = 'op-' . $set_code . '-' . $number . '-' . $set_code;
+
+                        if ( $number_trim !== $number ) {
+                            $candidates[] = $set_code . '-' . $number_trim;
+                            $candidates[] = $set_code . $number_trim;
+                            $candidates[] = 'op-' . $set_code . '-' . $number_trim;
+                            $candidates[] = 'op-' . $set_code . '-' . $number_trim . '-' . $set_code;
+                        }
                     }
                 }
             }
