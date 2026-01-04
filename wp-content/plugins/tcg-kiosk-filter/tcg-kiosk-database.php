@@ -176,6 +176,7 @@ if ( ! class_exists( 'TCG_Kiosk_Database' ) ) {
                     $cards[] = array(
                         'id'           => isset( $card['id'] ) ? (string) $card['id'] : '',
                         'name'         => isset( $card['name'] ) ? (string) $card['name'] : '',
+                        'rarity'       => isset( $card['rarity'] ) ? (string) $card['rarity'] : '',
                         'game'         => $game,
                         'set'          => $set_name,
                         'imageUrl'     => $image_sources['primary'],
