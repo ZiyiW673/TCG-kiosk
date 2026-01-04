@@ -3366,6 +3366,7 @@ CSS;
     selectedRarityValue = '';
     rarityOptionsContainer.innerHTML = '';
     rarityFilterWrapper.hidden = true;
+    rarityFilterWrapper.setAttribute( 'hidden', '' );
 
     const typeValue = gameSelect.value;
 
@@ -3403,6 +3404,7 @@ CSS;
 
     updateActiveRarityButton();
     rarityFilterWrapper.hidden = false;
+    rarityFilterWrapper.removeAttribute( 'hidden' );
   }
 
   function buildProxiedSrcset( srcset ) {
