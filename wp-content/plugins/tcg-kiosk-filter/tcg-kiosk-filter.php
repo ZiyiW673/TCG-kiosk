@@ -164,6 +164,7 @@ class TCG_Kiosk_Filter_Plugin {
                     'outOfStock' => __( 'Out of stock', 'tcg-kiosk-filter' ),
                     'notPurchasable' => __( 'This product cannot be purchased right now.', 'tcg-kiosk-filter' ),
                     'chooseVariant' => __( 'Choose a version', 'tcg-kiosk-filter' ),
+                    'allRarities' => __( 'All Rarities', 'tcg-kiosk-filter' ),
                 ),
             )
         );
@@ -219,6 +220,45 @@ header {
 
 .tcg-kiosk__type-filter[hidden] {
     display: none;
+}
+
+.tcg-kiosk__rarity-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.tcg-kiosk__rarity-filter[hidden] {
+    display: none !important;
+}
+
+.tcg-kiosk__rarity-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.tcg-kiosk__rarity-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tcg-kiosk__rarity-button {
+    border: 1px solid #c3c4c7;
+    background: #fff;
+    color: #1d2327;
+    border-radius: 999px;
+    padding: 0.3rem 0.85rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.tcg-kiosk__rarity-button.is-active {
+    background: #1d2327;
+    color: #fff;
+    border-color: #1d2327;
 }
 
 .tcg-kiosk__type-options {
@@ -1059,6 +1099,8 @@ CSS;
   const setSelect = document.getElementById( 'tcg-kiosk-set' );
   const typeFilterWrapper = document.getElementById( 'tcg-kiosk-type-filter' );
   const typeOptionsContainer = document.getElementById( 'tcg-kiosk-type-options' );
+  const rarityFilterWrapper = document.getElementById( 'tcg-kiosk-rarity-filter' );
+  const rarityOptionsContainer = document.getElementById( 'tcg-kiosk-rarity-options' );
   const searchInput = document.getElementById( 'tcg-kiosk-search' );
   const pageSizeSelect = document.getElementById( 'tcg-kiosk-page-size' );
   const pageSizeLabel = document.querySelector( 'label[for="tcg-kiosk-page-size"] span' );
@@ -1122,7 +1164,7 @@ CSS;
     [ 'yellow', '#1d2327' ],
   ] );
 
-  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
+  if ( ! kioskRoot || ! gameSelect || ! setSelect || ! typeFilterWrapper || ! typeOptionsContainer || ! rarityFilterWrapper || ! rarityOptionsContainer || ! searchInput || ! pageSizeSelect || ! resultsContainer || ! paginationContainer ) {
     return;
   }
 
@@ -1143,6 +1185,7 @@ CSS;
   let hasInteracted = false;
   let currentPage = 1;
   let selectedTypeValue = '';
+  let selectedRarityValue = '';
   let lastFocusedCard = null;
   let pendingPriceBadgeAnimationFrame = null;
   let filteredCardsCache = [];
@@ -2874,6 +2917,10 @@ CSS;
       cards = cards.filter( ( card ) => cardMatchesSelectedType( card, selectedGroup ) );
     }
 
+    if ( selectedRarityValue ) {
+      cards = cards.filter( ( card ) => cardMatchesSelectedRarity( card ) );
+    }
+
     if ( searchTerm ) {
       cards = cards.filter( ( card ) => card.name.toLowerCase().includes( searchTerm ) );
     }
@@ -3234,6 +3281,128 @@ CSS;
 
     updateActiveTypeButton();
     typeFilterWrapper.hidden = false;
+  }
+
+  function normalizeRarityValue( value ) {
+    if ( 'string' !== typeof value ) {
+      return '';
+    }
+
+    const cleaned = value.trim();
+
+    if ( ! cleaned ) {
+      return '';
+    }
+
+    return cleaned.toLowerCase();
+  }
+
+  function isOnePieceGame( slug ) {
+    if ( ! slug ) {
+      return false;
+    }
+
+    const normalized = String( slug ).toLowerCase();
+
+    return normalized.includes( 'one-piece' ) || normalized.includes( 'onepiece' );
+  }
+
+  function updateActiveRarityButton() {
+    const buttons = rarityOptionsContainer.querySelectorAll( '.tcg-kiosk__rarity-button' );
+
+    buttons.forEach( ( button ) => {
+      const value = button.dataset.value || '';
+      const isActive = value ? value === selectedRarityValue : selectedRarityValue === '';
+      button.classList.toggle( 'is-active', isActive );
+      button.setAttribute( 'aria-pressed', isActive ? 'true' : 'false' );
+    } );
+  }
+
+  function createRarityButton( value, label ) {
+    const button = document.createElement( 'button' );
+    button.type = 'button';
+    button.className = 'tcg-kiosk__rarity-button';
+    button.dataset.value = value;
+    button.textContent = label;
+    button.setAttribute( 'aria-pressed', 'false' );
+
+    button.addEventListener( 'click', () => {
+      if ( value && selectedRarityValue === value ) {
+        selectedRarityValue = '';
+      } else {
+        selectedRarityValue = value;
+      }
+
+      hasInteracted = true;
+      currentPage = 1;
+      updateActiveRarityButton();
+      renderCards();
+    } );
+
+    return button;
+  }
+
+  function cardMatchesSelectedRarity( card ) {
+    if ( ! card || 'object' !== typeof card ) {
+      return false;
+    }
+
+    const selection = normalizeRarityValue( selectedRarityValue );
+
+    if ( ! selection ) {
+      return false;
+    }
+
+    const rarity = normalizeRarityValue( card.rarity );
+
+    if ( ! rarity ) {
+      return false;
+    }
+
+    return rarity === selection;
+  }
+
+  function updateRarityOptions() {
+    selectedRarityValue = '';
+    rarityOptionsContainer.innerHTML = '';
+    rarityFilterWrapper.hidden = true;
+
+    const typeValue = gameSelect.value;
+
+    if ( ! typeValue || ! isOnePieceGame( typeValue ) ) {
+      return;
+    }
+
+    const selected = data.find( ( group ) => group.slug === typeValue );
+
+    if ( ! selected ) {
+      return;
+    }
+
+    const rarityValues = new Set();
+
+    selected.cards.forEach( ( card ) => {
+      if ( card && card.rarity ) {
+        rarityValues.add( card.rarity );
+      }
+    } );
+
+    if ( ! rarityValues.size ) {
+      return;
+    }
+
+    const options = Array.from( rarityValues )
+      .filter( Boolean )
+      .sort( ( a, b ) => String( a ).localeCompare( String( b ) ) );
+
+    rarityOptionsContainer.appendChild( createRarityButton( '', i18n.allRarities || 'All Rarities' ) );
+
+    options.forEach( ( rarity ) => {
+      rarityOptionsContainer.appendChild( createRarityButton( rarity, rarity ) );
+    } );
+
+    updateActiveRarityButton();
+    rarityFilterWrapper.hidden = false;
   }
 
   function buildProxiedSrcset( srcset ) {
@@ -3792,6 +3961,7 @@ CSS;
     currentPage = 1;
     updateSetOptions();
     updateTypeOptions();
+    updateRarityOptions();
     renderCards();
   } );
 
@@ -3846,6 +4016,7 @@ CSS;
   populateOverlayOptions();
   updateSetOptions();
   updateTypeOptions();
+  updateRarityOptions();
   applyPageSizeLayout();
   renderPagination( 0 );
   if ( gameSelect.value ) {
@@ -3915,6 +4086,10 @@ JS;
                 </div>
                 <div id="tcg-kiosk-type-filter" class="tcg-kiosk__type-filter" role="group" aria-label="<?php esc_attr_e( 'Type', 'tcg-kiosk-filter' ); ?>" data-default-label="<?php echo esc_attr__( 'Type', 'tcg-kiosk-filter' ); ?>" hidden>
                     <div id="tcg-kiosk-type-options" class="tcg-kiosk__type-options" role="presentation"></div>
+                </div>
+                <div id="tcg-kiosk-rarity-filter" class="tcg-kiosk__rarity-filter" role="group" aria-label="<?php esc_attr_e( 'Rarity', 'tcg-kiosk-filter' ); ?>" hidden>
+                    <span class="tcg-kiosk__rarity-label"><?php esc_html_e( 'Rarity', 'tcg-kiosk-filter' ); ?></span>
+                    <div id="tcg-kiosk-rarity-options" class="tcg-kiosk__rarity-options" role="presentation"></div>
                 </div>
                 <div class="tcg-kiosk__actions">
                     <div class="tcg-kiosk__actions-row">
