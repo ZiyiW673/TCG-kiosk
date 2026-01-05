@@ -218,6 +218,23 @@ header {
     margin-top: 15px;
 }
 
+.tcg-kiosk__type-and-rarity {
+    flex: 1 1 60%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.tcg-kiosk__type-and-rarity .tcg-kiosk__type-filter {
+    flex: 1 1 360px;
+}
+
+.tcg-kiosk__type-and-rarity .tcg-kiosk__rarity-filter {
+    flex: 0 1 200px;
+    margin-top: 15px;
+}
+
 .tcg-kiosk__type-filter[hidden] {
     display: none;
 }
@@ -4198,19 +4215,3 @@ JS;
 }
 
 TCG_Kiosk_Filter_Plugin::instance();
-.tcg-kiosk__type-and-rarity {
-    flex: 1 1 60%;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    align-items: flex-start;
-}
-
-.tcg-kiosk__type-and-rarity .tcg-kiosk__type-filter {
-    flex: 1 1 360px;
-}
-
-.tcg-kiosk__type-and-rarity .tcg-kiosk__rarity-filter {
-    flex: 0 1 200px;
-    margin-top: 15px;
-}
